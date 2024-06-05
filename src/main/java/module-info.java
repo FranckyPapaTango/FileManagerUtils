@@ -11,6 +11,11 @@ module com.rafaros.filemanagerutils {
     requires com.almasb.fxgl.all;
     requires java.desktop;
 
+
+    requires org.apache.commons.imaging; // Ajoutez cette ligne
+
     opens com.rafaros.filemanagerutils to javafx.fxml;
     exports com.rafaros.filemanagerutils;
+
+
 }

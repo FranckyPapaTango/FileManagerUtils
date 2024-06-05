@@ -13,12 +13,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import javax.imageio.ImageIO;
+import org.apache.commons.imaging.Imaging;
+import org.apache.commons.imaging.ImageReadException;
+
 public class FileManagerController {
+
     @FXML
     private TextField extensionField;
 
     @FXML
     private TextField selectedDirectoryField;
+
+    @FXML
+    private TextField selectedImagesField;
 
     private List<File> selectedFiles;
     private File selectedDirectory;
@@ -81,6 +89,80 @@ public class FileManagerController {
         }
     }
 
+    @FXML
+    private void handleSelectImages() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Images");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Image Files", "*.jpg", "*.png", "*.bpp")
+        );
+        selectedFiles = fileChooser.showOpenMultipleDialog(new Stage());
+
+        if (selectedFiles != null) {
+            StringBuilder fileNames = new StringBuilder();
+            for (File file : selectedFiles) {
+                fileNames.append(file.getName()).append("; ");
+            }
+            selectedImagesField.setText(fileNames.toString());
+        }
+    }
+
+    @FXML
+    private void handleRepairImages() {
+        if (selectedFiles != null) {
+            for (File file : selectedFiles) {
+                if (!isImageValid(file)) {
+                    System.out.println("Attempting to repair corrupted file: " + file.getName());
+                    if (repairImage(file)) {
+                        System.out.println("File repaired: " + file.getName());
+                    } else {
+                        System.out.println("Failed to repair file: " + file.getName());
+                        file.delete();
+                    }
+                } else {
+                    System.out.println("File is valid: " + file.getName());
+                }
+            }
+        }
+    }
+
+    private boolean isImageValid(File imageFile) {
+        try {
+            // Try to read the image using ImageIO
+            if (ImageIO.read(imageFile) == null) {
+                return false;
+            }
+
+            // Further validation with Apache Commons Imaging
+            try {
+                if (Imaging.getImageInfo(imageFile) == null) {
+                    return false;
+                }
+            } catch (ImageReadException e) {
+                return false;
+            }
+
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean repairImage(File imageFile) {
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    "magick", "convert", imageFile.getAbsolutePath(), imageFile.getAbsolutePath());
+            Process process = processBuilder.start();
+            int exitCode = process.waitFor();
+
+            // Exit code 0 indicates success
+            return exitCode == 0;
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     private boolean changeFilesExtension(List<File> files, String newExtension) {
         try {
             for (File file : files) {
@@ -139,10 +221,25 @@ public class FileManagerController {
             } else {
                 String newFileName = directory.getName() + "_" + (i + 1) + getFileExtension(file);
                 Path source = file.toPath();
-                Files.move(source, source.resolveSibling(newFileName));
+                Path target = source.resolveSibling(newFileName);
+
+                // Vérifie si le fichier cible existe déjà
+                if (Files.exists(target)) {
+                    System.out.println("File already exists: " + target);
+                    continue; // Passe au fichier suivant
+                }
+
+                // Déplacer le fichier
+                try {
+                    Files.move(source, target);
+                } catch (IOException e) {
+                    System.err.println("Failed to move file: " + source);
+                    e.printStackTrace();
+                }
             }
         }
     }
+
 
     private String getFileExtension(File file) {
         String fileName = file.getName();

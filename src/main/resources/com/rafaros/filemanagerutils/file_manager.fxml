@@ -28,4 +28,14 @@
             </VBox>
         </AnchorPane>
     </Tab>
+    <Tab text="Repair Corrupted Images">
+        <AnchorPane>
+            <!-- Contenu de l'onglet "Repair Corrupted Images" -->
+            <VBox spacing="10" alignment="CENTER" layoutX="20.0" layoutY="20.0">
+                <Button text="Select Images" onAction="#handleSelectImages"/>
+                <TextField fx:id="selectedImagesField" editable="false" promptText="Selected Images" />
+                <Button text="Repair Images" onAction="#handleRepairImages"/>
+            </VBox>
+        </AnchorPane>
+    </Tab>
 </TabPane>

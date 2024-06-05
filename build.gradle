@@ -55,6 +55,7 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
 
     implementation 'net.synedra:validatorfx:0.3.1'
+    implementation 'org.apache.commons:commons-imaging:1.0-alpha2'
 
 }
 
