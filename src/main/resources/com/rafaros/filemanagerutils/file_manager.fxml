@@ -1,18 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.rafaros.filemanagerutils.FileManagerController">
-    <children>
-        <HBox spacing="10" alignment="CENTER">
-            <children>
-                <Button text="Select Files" onAction="#handleSelectFiles"/>
-                <Label text="Change Extension:"/>
-                <TextField fx:id="extensionField" prefWidth="150"/>
-                <Button text="Proceed" onAction="#handleProceed"/>
-            </children>
-        </HBox>
-    </children>
-</VBox>
+<TabPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.rafaros.filemanagerutils.FileManagerController">
+    <Tab text="File Extension">
+        <AnchorPane>
+            <!-- Contenu de l'onglet "File Extension" -->
+            <Button text="Select Files" onAction="#handleSelectFiles" layoutX="20.0" layoutY="20.0" />
+            <Button text="Proceed" onAction="#handleProceed" layoutX="100.0" layoutY="20.0" />
+            <Label text="File Extension:" layoutX="20.0" layoutY="70.0" />
+            <TextField fx:id="extensionField" layoutX="120.0" layoutY="70.0" />
+        </AnchorPane>
+    </Tab>
+    <Tab text="Rename by FolderName">
+        <AnchorPane>
+            <!-- Contenu de l'onglet "Rename by FolderName" -->
+            <VBox spacing="10" alignment="CENTER" layoutX="20.0" layoutY="20.0">
+                <Button text="Select Directory" onAction="#handleSelectDirectory"/>
+                <TextField fx:id="selectedDirectoryField" editable="false" promptText="Selected Directory" />
+                <Button text="Rename Content" fx:id="renameButton" onAction="#handleRenameContent"/>
+            </VBox>
+        </AnchorPane>
+    </Tab>
+</TabPane>
