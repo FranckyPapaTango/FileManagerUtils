@@ -1,6 +1,7 @@
 package com.rafaros.filemanagerutils;
 
 import javafx.fxml.FXML;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.TextField;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -28,8 +29,15 @@ public class FileManagerController {
     @FXML
     private TextField selectedImagesField;
 
+    @FXML
+    private CheckBox gatherInContainerCheckbox;
+
+    @FXML
+    private TextField containerNameField;
+
     private List<File> selectedFiles;
     private File selectedDirectory;
+    private File containerDirectory;
 
     @FXML
     private void handleSelectFiles() {
@@ -76,11 +84,35 @@ public class FileManagerController {
             return;
         }
 
+        if (gatherInContainerCheckbox.isSelected()) {
+            String containerName = containerNameField.getText().trim();
+            while (true) {
+                if (containerName.isEmpty()) {
+                    showMessage("Container name is empty", "Error");
+                    return;
+                }
+                containerDirectory = new File(selectedDirectory, containerName);
+
+                // Vérifie si le répertoire de conteneur existe déjà
+                if (containerDirectory.exists()) {
+                    showMessage("Container directory already exists. Please define a different name.", "Error");
+                    return;
+
+                }
+
+                    break;
+
+            }
+        }
         int confirm = showConfirmDialog("Are you sure you want to rename the content of this directory?", "Confirmation");
         if (confirm != JOptionPane.YES_OPTION) {
             return;
         }
-
+        // Crée le répertoire de conteneur s'il n'existe pas
+        if (!containerDirectory.mkdirs()) {
+            showMessage("Failed to create container directory", "Error");
+            return;
+        }
         boolean success = renameFilesInDirectory(selectedDirectory);
         if (success) {
             showMessage("Success!", "Information");
@@ -88,6 +120,8 @@ public class FileManagerController {
             showMessage("An error occurred", "Error");
         }
     }
+
+
 
     @FXML
     private void handleSelectImages() {
@@ -124,6 +158,11 @@ public class FileManagerController {
                 }
             }
         }
+    }
+
+    @FXML
+    private void handleGatherInContainer() {
+        containerNameField.setVisible(gatherInContainerCheckbox.isSelected());
     }
 
     private boolean isImageValid(File imageFile) {
@@ -221,7 +260,12 @@ public class FileManagerController {
             } else {
                 String newFileName = directory.getName() + "_" + (i + 1) + getFileExtension(file);
                 Path source = file.toPath();
-                Path target = source.resolveSibling(newFileName);
+                Path target;
+                if (gatherInContainerCheckbox.isSelected() && containerDirectory != null) {
+                    target = containerDirectory.toPath().resolve(newFileName);
+                } else {
+                    target = source.resolveSibling(newFileName);
+                }
 
                 // Vérifie si le fichier cible existe déjà
                 if (Files.exists(target)) {
@@ -239,7 +283,6 @@ public class FileManagerController {
             }
         }
     }
-
 
     private String getFileExtension(File file) {
         String fileName = file.getName();
