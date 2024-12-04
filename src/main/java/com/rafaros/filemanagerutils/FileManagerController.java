@@ -2,17 +2,21 @@ package com.rafaros.filemanagerutils;
 
 import javafx.fxml.FXML;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import javax.swing.*;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
 import org.apache.commons.imaging.Imaging;
@@ -34,6 +38,15 @@ public class FileManagerController {
 
     @FXML
     private TextField containerNameField;
+
+    @FXML
+    private Label locationLabel;
+
+    @FXML
+    private Label statusLabel;
+
+    private File selectedDirectory2; // pour la fonctionnalité de génération .txt de liste de fullpathname de fichier d'images
+
 
     private List<File> selectedFiles;
     private File selectedDirectory;
@@ -186,6 +199,69 @@ public class FileManagerController {
             return false;
         }
     }
+
+    /**
+     * Ouvre un sélecteur de dossier pour choisir l'emplacement.
+     */
+    @FXML
+    private void handleChooseLocation() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Folder");
+        File directory = directoryChooser.showDialog(null);
+        if (directory != null) {
+            selectedDirectory2 = directory;
+            locationLabel.setText("Selected: " + directory.getAbsolutePath());
+        } else {
+            locationLabel.setText("No folder selected");
+        }
+    }
+
+    /**
+     * Génère la liste des fichiers et enregistre dans filesList.txt.
+     */
+    @FXML
+    private void handleGenerateFilesList() {
+        if (selectedDirectory2 == null) {
+            statusLabel.setText("Status: Please select a folder first!");
+            return;
+        }
+
+        Path outputDir = Paths.get(selectedDirectory2.getAbsolutePath(), "fileList");
+        Path outputFile = outputDir.resolve("filesList.txt");
+
+        try {
+            // Crée le dossier fileList s'il n'existe pas.
+            if (!Files.exists(outputDir)) {
+                Files.createDirectories(outputDir);
+            }
+
+            // Ajout du BOM en début de fichier, suivi de l'écriture des chemins de fichiers.
+            try (OutputStream outputStream = Files.newOutputStream(outputFile);
+                 Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
+
+                // Écriture du BOM UTF-8.
+                outputStream.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+
+                // Récupère tous les fichiers avec les extensions spécifiées.
+                List<String> filePaths = Files.walk(selectedDirectory2.toPath())
+                        .filter(Files::isRegularFile)
+                        .map(Path::toString)
+                        .filter(path -> path.matches(".*\\.(jpg|jpeg|png|bmp|webp)$"))
+                        .collect(Collectors.toList());
+
+                for (String filePath : filePaths) {
+                    writer.write(filePath + System.lineSeparator());
+                }
+
+                statusLabel.setText("Status: Files list generated successfully in UTF-8 with BOM!");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            statusLabel.setText("Status: An error occurred while generating the files list.");
+        }
+    }
+
+
 
     private boolean repairImage(File imageFile) {
         try {
