@@ -2,7 +2,12 @@ plugins {
     id 'java'
     id 'application'
     id 'org.openjfx.javafxplugin' version '0.0.10'
+    id 'com.github.johnrengelman.shadow' version '6.1.0'
+
+   // id 'edu.sc.seis.launch4j' version '3.0.3' // Plugin pour Launch4j
+    id 'edu.sc.seis.launch4j' version '2.4.7'
     id 'org.beryx.jlink' version '2.24.1'
+
 }
 
 group 'com.rafaros'
@@ -19,14 +24,8 @@ ext {
 sourceCompatibility = '11'
 targetCompatibility = '11'
 
-tasks.withType(JavaCompile) {
+tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-}
-
-application {
-    mainModule = 'com.rafaros.filemanagerutils'
-    //mainClass = 'com.rafaros.filemanagerutils.HelloApplication'
-    mainClass = 'com.rafaros.filemanagerutils.FileManagerUtils'
 }
 
 javafx {
@@ -35,42 +34,95 @@ javafx {
 }
 
 dependencies {
-    implementation('org.controlsfx:controlsfx:11.1.1')
-    implementation('com.dlsc.formsfx:formsfx-core:11.3.2') {
-        exclude(group: 'org.openjfx')
-    }
-    implementation('net.synedra:validatorfx:0.2.1') {
-        exclude(group: 'org.openjfx')
-    }
-    implementation('org.kordamp.ikonli:ikonli-javafx:12.3.0')
-    implementation('org.kordamp.bootstrapfx:bootstrapfx-core:0.4.0')
-    implementation('eu.hansolo:tilesfx:11.48') {
-        exclude(group: 'org.openjfx')
-    }
-    implementation('com.github.almasb:fxgl:11.17') {
-        exclude(group: 'org.openjfx')
-    }
-
-    testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
-
+    implementation 'org.controlsfx:controlsfx:11.1.1'
+    implementation 'com.dlsc.formsfx:formsfx-core:11.3.2'
     implementation 'net.synedra:validatorfx:0.3.1'
+    implementation 'org.kordamp.ikonli:ikonli-javafx:12.3.0'
+    implementation 'org.kordamp.bootstrapfx:bootstrapfx-core:0.4.0'
+    implementation 'eu.hansolo:tilesfx:11.48'
+    implementation 'com.github.almasb:fxgl:11.17'
     implementation 'org.apache.commons:commons-imaging:1.0-alpha2'
 
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
 }
 
-test {
+application {
+    mainClass = 'com.rafaros.filemanagerutils.FileManagerUtils'
+    // Ajout explicite pour compatibilité
+    mainClassName = 'com.rafaros.filemanagerutils.FileManagerUtils'
+}
+
+tasks.withType(Test) {
     useJUnitPlatform()
 }
 
-jlink {
-    imageZip = project.file("${buildDir}/distributions/app-${javafx.platform.classifier}.zip")
-    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
-    launcher {
-        name = 'app'
+shadowJar {
+    archiveBaseName.set('FileManagerUtils')
+    archiveClassifier.set('')
+    archiveVersion.set('')
+    manifest {
+        attributes(
+                'Main-Class': application.mainClass
+        )
+    }
+    mergeServiceFiles()
+    dependencies {
+        include(dependency('org.apache.commons:commons-imaging'))
+        include(dependency('org.openjfx:javafx.*'))
     }
 }
 
-jlinkZip {
-    group = 'distribution'
+
+/*jlink {
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+    launcher {
+        name = 'FileManagerUtils'
+    }
+}*/
+
+
+launch4j {
+    mainClassName = 'com.rafaros.filemanagerutils.FileManagerUtils'
+    //jar = "${shadowJar.archiveFile.get().asFile.path}" // Chemin dynamique vers le JAR généré
+    jar = "${buildDir}/libs/FileManagerUtils.jar"
+    outfile = "FileManagerUtils.exe"
+
+    icon = file('src/main/resources/logo/File-Manager.ico')
+    jreMinVersion = '11'
+    jvmOptions = ['-Xms64m', '-Xmx128m']
+
+
+
+
+
+
+
+    // Le chemin du JDK qui inclut le JRE
+    // Ajoute automatiquement les fichiers JavaFX dans le dossier lib
+    bundledJrePath = 'C:/Users/DESKTOP-LSFP9J9/.sdkman/candidates/java/11.0.20-zulu'
+   // copyLibraries = true // Important pour inclure les dépendances dans le dossier lib
+
+    //version = '1.0.0'
+    companyName = 'Rafaros'
+    fileDescription = 'File Manager Utils Application'
+}
+
+// Ajoute une tâche pour copier JavaFX dans le dossier lib
+tasks.register("copyJavaFxLibs", Copy) {
+    from fileTree(dir: "C:/Users/DESKTOP-LSFP9J9/.sdkman/candidates/openjfx-11.0.2_windows-x64_bin-sdk/javafx-sdk-11.0.2/lib", include: "*.jar")
+    into "${buildDir}/libs/lib"
+}
+tasks.register('copyDependencies', Copy) {
+    from configurations.runtimeClasspath
+    into "${buildDir}/libs"
+}
+
+
+tasks.createExe {
+    dependsOn "copyJavaFxLibs"
+}
+
+tasks.build {
+    dependsOn shadowJar
 }
