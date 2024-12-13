@@ -20,18 +20,24 @@
             <TextField fx:id="extensionField" layoutX="120.0" layoutY="70.0" />
         </AnchorPane>
     </Tab>
+
     <Tab text="Pics FileList Generator">
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER" prefWidth="400" prefHeight="300">
-                <HBox spacing="10" alignment="CENTER" >
+                <HBox spacing="10" alignment="CENTER">
                     <Button text="Location" onAction="#handleChooseLocation"/>
                     <Label fx:id="locationLabel" text="No folder selected"/>
+                </HBox>
+                <HBox spacing="10" alignment="CENTER">
+                    <Label text="Restriction:"/>
+                    <TextField fx:id="restrictionField" promptText="Enter folder prefix"/>
                 </HBox>
                 <Button text="Generate Files List" onAction="#handleGenerateFilesList"/>
                 <Label fx:id="statusLabel" text="Status: Waiting"/>
             </VBox>
         </AnchorPane>
     </Tab>
+
     <Tab text="Rename by FolderName">
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1">

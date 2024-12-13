@@ -226,6 +226,10 @@ public class FileManagerController {
             return;
         }
 
+        // Récupération et nettoyage de la restriction
+        String restriction = restrictionField.getText() != null ? restrictionField.getText().trim() : "";
+        boolean hasRestriction = !restriction.isEmpty();
+
         Path outputDir = Paths.get(selectedDirectory2.getAbsolutePath(), "fileList");
         Path outputFile = outputDir.resolve("filesList.txt");
 
@@ -245,8 +249,16 @@ public class FileManagerController {
                 // Récupère tous les fichiers avec les extensions spécifiées.
                 List<String> filePaths = Files.walk(selectedDirectory2.toPath())
                         .filter(Files::isRegularFile)
-                        .map(Path::toString)
-                        .filter(path -> path.matches(".*\\.(jpg|jpeg|png|bmp|webp)$"))
+                        .map(Path::toString) // Convertir Path en String avant le filtrage
+                        .filter(path -> path.matches(".*\\.(jpg|JPG|jpeg|png|PNG|bmp|BMP|webp|gif)$")) // Filtre sur les extensions d'images
+                        .filter(path -> {
+                            if (hasRestriction) {
+                                // Vérifie si le fichier appartient à un dossier correspondant à la restriction
+                                Path parentDir = Paths.get(path).getParent();
+                                return parentDir != null && parentDir.getFileName().toString().startsWith(restriction);
+                            }
+                            return true; // Pas de restriction, tous les fichiers sont pris en compte
+                        })
                         .collect(Collectors.toList());
 
                 for (String filePath : filePaths) {
@@ -261,6 +273,10 @@ public class FileManagerController {
         }
     }
 
+
+
+    @FXML
+    private TextField restrictionField;
 
 
     private boolean repairImage(File imageFile) {
