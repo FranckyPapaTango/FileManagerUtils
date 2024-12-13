@@ -250,7 +250,7 @@ public class FileManagerController {
                 List<String> filePaths = Files.walk(selectedDirectory2.toPath())
                         .filter(Files::isRegularFile)
                         .map(Path::toString) // Convertir Path en String avant le filtrage
-                        .filter(path -> path.matches(".*\\.(jpg|JPG|jpeg|png|PNG|bmp|BMP|webp|gif)$")) // Filtre sur les extensions d'images
+                        .filter(path -> path.matches(".*\\.(jpg|JPG|jpeg|JPEG|png|PNG|bmp|BMP|webp|WEBP|gif|GIF)$")) // Filtre sur les extensions d'images
                         .filter(path -> {
                             if (hasRestriction) {
                                 // Vérifie si le fichier appartient à un dossier correspondant à la restriction
