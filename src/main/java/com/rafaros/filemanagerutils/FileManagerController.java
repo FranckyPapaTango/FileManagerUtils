@@ -14,7 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -217,7 +219,9 @@ public class FileManagerController {
     }
 
     /**
-     * Génère la liste des fichiers et enregistre dans filesList.txt.
+     * Génère la liste des fichiers et enregistre dans plusieurs fichiers .txt
+     * de 12 000 éléments maximum chacun (filesList_1.txt, filesList_2.txt, ...)
+     * dans un ordre aléatoire.
      */
     @FXML
     private void handleGenerateFilesList() {
@@ -231,7 +235,6 @@ public class FileManagerController {
         boolean hasRestriction = !restriction.isEmpty();
 
         Path outputDir = Paths.get(selectedDirectory2.getAbsolutePath(), "fileList");
-        Path outputFile = outputDir.resolve("filesList.txt");
 
         try {
             // Crée le dossier fileList s'il n'existe pas.
@@ -239,39 +242,67 @@ public class FileManagerController {
                 Files.createDirectories(outputDir);
             }
 
-            // Ajout du BOM en début de fichier, suivi de l'écriture des chemins de fichiers.
-            try (OutputStream outputStream = Files.newOutputStream(outputFile);
-                 Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
+            // Récupère tous les fichiers avec les extensions spécifiées.
+            List<String> filePaths = Files.walk(selectedDirectory2.toPath())
+                    .filter(Files::isRegularFile)
+                    .map(Path::toString)
+                    .filter(path -> path.matches(".*\\.(jpg|JPG|jpeg|JPEG|png|PNG|bmp|BMP|webp|WEBP|gif|GIF)$"))
+                    .filter(path -> {
+                        if (hasRestriction) {
+                            Path parentDir = Paths.get(path).getParent();
+                            return parentDir != null && parentDir.getFileName().toString().startsWith(restriction);
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toList());
 
-                // Écriture du BOM UTF-8.
-                outputStream.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
-
-                // Récupère tous les fichiers avec les extensions spécifiées.
-                List<String> filePaths = Files.walk(selectedDirectory2.toPath())
-                        .filter(Files::isRegularFile)
-                        .map(Path::toString) // Convertir Path en String avant le filtrage
-                        .filter(path -> path.matches(".*\\.(jpg|JPG|jpeg|JPEG|png|PNG|bmp|BMP|webp|WEBP|gif|GIF)$")) // Filtre sur les extensions d'images
-                        .filter(path -> {
-                            if (hasRestriction) {
-                                // Vérifie si le fichier appartient à un dossier correspondant à la restriction
-                                Path parentDir = Paths.get(path).getParent();
-                                return parentDir != null && parentDir.getFileName().toString().startsWith(restriction);
-                            }
-                            return true; // Pas de restriction, tous les fichiers sont pris en compte
-                        })
-                        .collect(Collectors.toList());
-
-                for (String filePath : filePaths) {
-                    writer.write(filePath + System.lineSeparator());
-                }
-
-                statusLabel.setText("Status: Files list generated successfully in UTF-8 with BOM!");
+            if (filePaths.isEmpty()) {
+                statusLabel.setText("Status: No matching files found.");
+                return;
             }
+
+            // Mélange aléatoire de la liste complète
+            Collections.shuffle(filePaths, new Random(System.currentTimeMillis()));
+
+            // Taille max d’un fichier
+            final int MAX_FILES_PER_TXT = 12_000;
+
+            // Nombre total de fichiers à générer
+            int totalFiles = (int) Math.ceil((double) filePaths.size() / MAX_FILES_PER_TXT);
+
+            for (int i = 0; i < totalFiles; i++) {
+                int start = i * MAX_FILES_PER_TXT;
+                int end = Math.min(start + MAX_FILES_PER_TXT, filePaths.size());
+
+                List<String> subList = filePaths.subList(start, end);
+
+                String fileName = String.format("filesList_%d.txt", i + 1);
+                Path outputFile = outputDir.resolve(fileName);
+
+                try (OutputStream outputStream = Files.newOutputStream(outputFile);
+                     Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
+
+                    // Écriture du BOM UTF-8
+                    outputStream.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+
+                    // Écriture des chemins
+                    for (String filePath : subList) {
+                        writer.write(filePath + System.lineSeparator());
+                    }
+                }
+            }
+
+            statusLabel.setText(String.format(
+                    "Status: %d randomized file(s) list generated successfully in UTF-8 with BOM!",
+                    totalFiles
+            ));
         } catch (IOException e) {
             e.printStackTrace();
             statusLabel.setText("Status: An error occurred while generating the files list.");
         }
     }
+
+
 
 
 
