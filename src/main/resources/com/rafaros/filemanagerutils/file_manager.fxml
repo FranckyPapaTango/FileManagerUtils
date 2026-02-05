@@ -10,22 +10,36 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.layout.HBox?>
 
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.Pane?>
+
+
 <TabPane xmlns:fx="http://javafx.com/fxml/1"
          fx:controller="com.rafaros.filemanagerutils.FileManagerController">
 
     <Tab text="File Extension">
-        <AnchorPane>
-            <Button text="Select Files" onAction="#handleSelectFiles"
-                    layoutX="20.0" layoutY="20.0" />
-            <Button text="Proceed" onAction="#handleProceed"
-                    layoutX="100.0" layoutY="20.0" />
-            <Label text="File Extension:" layoutX="20.0" layoutY="70.0" />
-            <TextField fx:id="extensionField"
-                       layoutX="120.0" layoutY="70.0" />
-        </AnchorPane>
+        <StackPane styleClass="tab-bg-1">
+            <Pane styleClass="overlay"/>
+
+            <AnchorPane>
+                <Button text="Select Files"
+                        onAction="#handleSelectFiles"
+                        layoutX="20.0" layoutY="20.0"/>
+                <Button text="Proceed"
+                        onAction="#handleProceed"
+                        layoutX="100.0" layoutY="20.0"/>
+                <Label text="File Extension:"
+                       layoutX="20.0" layoutY="70.0"/>
+                <TextField fx:id="extensionField"
+                           layoutX="120.0" layoutY="70.0"/>
+            </AnchorPane>
+        </StackPane>
     </Tab>
 
+
     <Tab text="Pics FileList Generator">
+        <StackPane styleClass="tab-bg-1">
+        <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER"
                   prefWidth="400" prefHeight="300">
@@ -43,10 +57,13 @@
                 <Label fx:id="statusLabel" text="Status: Waiting"/>
             </VBox>
         </AnchorPane>
+        </StackPane>
     </Tab>
 
     <!-- 🔹 NOUVEL ONGLET -->
     <Tab text="File List Strate Moving">
+        <StackPane styleClass="tab-bg-1">
+        <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="12" alignment="CENTER" prefWidth="400" prefHeight="300">
 
@@ -83,10 +100,13 @@
 
             </VBox>
         </AnchorPane>
+        </StackPane>
     </Tab>
 
 
     <Tab text="Rename by FolderName">
+        <StackPane styleClass="tab-bg-1">
+        <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER">
                 <Button text="Select Directory"
@@ -104,9 +124,12 @@
                            visible="false"/>
             </VBox>
         </AnchorPane>
+        </StackPane>
     </Tab>
 
     <Tab text="Repair Corrupted Images">
+        <StackPane styleClass="tab-bg-1">
+        <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER"
                   layoutX="20.0" layoutY="20.0">
@@ -119,6 +142,7 @@
                         onAction="#handleRepairImages"/>
             </VBox>
         </AnchorPane>
+        </StackPane>
     </Tab>
 
 </TabPane>

@@ -1,7 +1,5 @@
 package com.rafaros.filemanagerutils;
 
-
-
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -9,26 +7,28 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 
 public class FileManagerUtils extends Application {
+
     @Override
-    public void start(Stage primaryStage) throws Exception {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("file_manager.fxml"));
+    public void start(Stage stage) throws Exception {
+
+        FXMLLoader loader = new FXMLLoader(
+                getClass().getResource("file_manager.fxml")
+        );
         Parent root = loader.load();
 
-        // Initial dimensions of the scene
-        double initialWidth = 600;  // Replace with your initial width
-        double initialHeight = 400; // Replace with your initial height
+        Scene scene = new Scene(root, 800, 600);
 
-        // New dimensions
-        double newWidth = initialWidth * 1;
-        double newHeight = initialHeight * 1;
+        // 🔥 Chargement du CSS
+        scene.getStylesheets().add(
+                getClass().getResource("/styles/tabs.css").toExternalForm()
+        );
 
-        primaryStage.setTitle("File Manager Utils");
-        primaryStage.setScene(new Scene(root, newWidth, newHeight));
-        primaryStage.show();
+        stage.setTitle("File Manager Utils");
+        stage.setScene(scene);
+        stage.show();
     }
 
     public static void main(String[] args) {
         launch(args);
     }
 }
-

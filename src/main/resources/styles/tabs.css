@@ -1,0 +1,32 @@
+/* Image par onglet */
+.tab-bg-1 {
+    -fx-background-image: url("../images/tab1.png");
+}
+.tab-bg-2 {
+    -fx-background-image: url("../images/tab2.png");
+}
+.tab-bg-3 {
+    -fx-background-image: url("../images/tab3.png");
+}
+.tab-bg-4 {
+    -fx-background-image: url("../images/tab4.png");
+}
+.tab-bg-5 {
+    -fx-background-image: url("../images/tab5.png");
+}
+
+/* Comportement commun */
+.tab-bg-1,
+.tab-bg-2,
+.tab-bg-3,
+.tab-bg-4,
+.tab-bg-5 {
+    -fx-background-size: cover;
+    -fx-background-position: center;
+    -fx-background-repeat: no-repeat;
+}
+
+/* Lisibilité (optionnel mais recommandé) */
+.overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.35);
+}
