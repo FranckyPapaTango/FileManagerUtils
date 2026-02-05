@@ -466,26 +466,35 @@ public class FileManagerController {
      */
     private String cleanName(String fileName) {
         String name = getFileNameWithoutExtension(fileName).trim();
-        // 🔁 Supprime les suffixes parasites EN FIN uniquement
-        // ex: (17), _1, _12, (17)_1_1, etc.
         boolean changed;
         do {
             String before = name;
-            // (123)
+            // 🔹 Supprime (123) en fin
             name = name.replaceAll("\\s*\\(\\d+\\)$", "");
-            // _1, _12, _001
+            // 🔹 Supprime _1, _12, _001 en fin
             name = name.replaceAll("_\\d+$", "");
-            // espaces résiduels
+            // 🔹 Supprime chiffres collés en FIN de mot
+            name = name.replaceAll("(\\p{L})\\d+$", "$1");
+            // 🔹 Supprime chiffres collés en DÉBUT de mot
+            name = name.replaceAll("^\\d+(\\p{L})", "$1");
             name = name.trim();
             changed = !name.equals(before);
         } while (changed);
-        // 🔹 Nettoyage léger des bords seulement
-        name = name.replaceAll("^[^\\p{L}\\p{N}\\+\\-_'() ]+|[^\\p{L}\\p{N}\\+\\-_'() ]+$", "");
-        // 🔹 Espaces propres
+        // 🔹 Nettoyage doux des bords seulement
+        name = name.replaceAll(
+                "^[^\\p{L}\\p{N}\\+\\-_'() ]+|[^\\p{L}\\p{N}\\+\\-_'() ]+$",
+                ""
+        );
+        // 🔒 PARANO MODE : normalisation des espaces Unicode chelous
+        name = name.replace('\u00A0', ' ')   // espace insécable
+                .replace('\u2007', ' ')   // espace figure
+                .replace('\u202F', ' ');  // espace fine insécable
+        // 🔹 Espaces propres (compression à 1)
         name = name.replaceAll("\\s+", " ").trim();
         if (name.isEmpty()) name = "UNKNOWN";
         return name;
     }
+
 
 
 
