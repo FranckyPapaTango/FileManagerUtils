@@ -18,32 +18,47 @@
 <TabPane xmlns:fx="http://javafx.com/fxml/1"
          fx:controller="com.rafaros.filemanagerutils.FileManagerController">
 
-    <Tab text="File Extension">
+    <Tab text="File Extension" styleClass="tab-header-1" closable="false">
         <StackPane styleClass="tab-bg-1">
             <Pane styleClass="overlay"/>
 
             <AnchorPane>
-                <Button text="Select Files"
-                        onAction="#handleSelectFiles"
-                        layoutX="20.0" layoutY="20.0"/>
-                <Button text="Proceed"
-                        onAction="#handleProceed"
-                        layoutX="100.0" layoutY="20.0"/>
-                <Label text="File Extension:"
-                       layoutX="20.0" layoutY="70.0"/>
-                <TextField fx:id="extensionField"
-                           layoutX="120.0" layoutY="70.0"/>
+                <VBox spacing="12"
+                      alignment="CENTER"
+                      AnchorPane.topAnchor="0"
+                      AnchorPane.bottomAnchor="0"
+                      AnchorPane.leftAnchor="0"
+                      AnchorPane.rightAnchor="0">
+
+                    <Button text="Select Files"
+                            onAction="#handleSelectFiles"/>
+
+                    <Button text="Proceed"
+                            onAction="#handleProceed"/>
+
+                    <HBox spacing="10" alignment="CENTER">
+                        <Label text="File Extension:"/>
+                        <TextField fx:id="extensionField" prefWidth="150"/>
+                    </HBox>
+
+                </VBox>
             </AnchorPane>
+
         </StackPane>
     </Tab>
 
 
-    <Tab text="Pics FileList Generator">
+    <Tab text="Pics FileList Generator" styleClass="tab-header-2" closable="false">
         <StackPane styleClass="tab-bg-2">
         <Pane styleClass="overlay"/>
-        <AnchorPane>
-            <VBox spacing="10" alignment="CENTER"
-                  prefWidth="400" prefHeight="300">
+            <AnchorPane>
+                <VBox spacing="12"
+                      alignment="CENTER"
+                      AnchorPane.topAnchor="0"
+                      AnchorPane.bottomAnchor="0"
+                      AnchorPane.leftAnchor="0"
+                      AnchorPane.rightAnchor="0">
+
                 <HBox spacing="10" alignment="CENTER">
                     <Button text="Location" onAction="#handleChooseLocation"/>
                     <Label fx:id="locationLabel" text="No folder selected"/>
@@ -62,11 +77,16 @@
     </Tab>
 
     <!-- 🔹 NOUVEL ONGLET -->
-    <Tab text="File List Strate Moving">
+    <Tab text="File List Strate Moving" styleClass="tab-header-3" closable="false">
         <StackPane styleClass="tab-bg-3">
         <Pane styleClass="overlay"/>
         <AnchorPane>
-            <VBox spacing="12" alignment="CENTER" prefWidth="400" prefHeight="300">
+            <VBox spacing="12"
+                  alignment="CENTER"
+                  AnchorPane.topAnchor="0"
+                  AnchorPane.bottomAnchor="0"
+                  AnchorPane.leftAnchor="0"
+                  AnchorPane.rightAnchor="0">
 
 
                 <!-- 🔹 NOUVEAU BOUTON EXPORT RECYCLE BIN -->
@@ -105,11 +125,17 @@
     </Tab>
 
 
-    <Tab text="Rename by FolderName">
+    <Tab text="Rename by FolderName" styleClass="tab-header-4" closable="false">
         <StackPane styleClass="tab-bg-4">
         <Pane styleClass="overlay"/>
         <AnchorPane>
-            <VBox spacing="10" alignment="CENTER">
+            <VBox spacing="12"
+                  alignment="CENTER"
+                  AnchorPane.topAnchor="0"
+                  AnchorPane.bottomAnchor="0"
+                  AnchorPane.leftAnchor="0"
+                  AnchorPane.rightAnchor="0">
+
                 <Button text="Select Directory"
                         onAction="#handleSelectDirectory"/>
                 <TextField fx:id="selectedDirectoryField"
@@ -129,7 +155,7 @@
     </Tab>
 
     <!-- 🔹 NEW TAB : Folder Content Distributor -->
-    <Tab text="Folder Content Distributor">
+    <Tab text="Folder Content Distributor" styleClass="tab-header-5" closable="false">
         <StackPane styleClass="tab-bg-5">
             <Pane styleClass="overlay"/>
 
@@ -172,12 +198,17 @@
 
 
 
-    <Tab text="Repair Corrupted Images">
+    <Tab text="Repair Corrupted Images" styleClass="tab-header-6" closable="false">
         <StackPane styleClass="tab-bg-6">
         <Pane styleClass="overlay"/>
         <AnchorPane>
-            <VBox spacing="10" alignment="CENTER"
-                  layoutX="20.0" layoutY="20.0">
+            <VBox spacing="12"
+                  alignment="CENTER"
+                  AnchorPane.topAnchor="0"
+                  AnchorPane.bottomAnchor="0"
+                  AnchorPane.leftAnchor="0"
+                  AnchorPane.rightAnchor="0">
+
                 <Button text="Select Images"
                         onAction="#handleSelectImages"/>
                 <TextField fx:id="selectedImagesField"

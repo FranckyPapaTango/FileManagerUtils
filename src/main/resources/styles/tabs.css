@@ -1,21 +1,33 @@
-/* Image par onglet */
+/* files : resources/styles/tab.css */
+/* =========================================================
+   IMAGES DE FOND PAR ONGLET (contenu)
+   ========================================================= */
+
 .tab-bg-1 {
-    -fx-background-image: url("../images/tab1.png");
-}
-.tab-bg-2 {
-    -fx-background-image: url("../images/tab2.png");
-}
-.tab-bg-3 {
-    -fx-background-image: url("../images/tab3.png");
-}
-.tab-bg-4 {
-    -fx-background-image: url("../images/tab4.png");
-}
-.tab-bg-5 {
-    -fx-background-image: url("../images/tab5.png");
+    -fx-background-image: url("../images/image1.jpg");
 }
 
-/* Comportement commun */
+.tab-bg-2 {
+    -fx-background-image: url("../images/image2.png");
+}
+
+.tab-bg-3 {
+    -fx-background-image: url("../images/image3.jpg");
+}
+
+.tab-bg-4 {
+    -fx-background-image: url("../images/image4.jpg");
+}
+
+.tab-bg-5 {
+    -fx-background-image: url("../images/image5.png");
+}
+
+.tab-bg-6 {
+    -fx-background-image: url("../images/tab6.png");
+}
+
+/* Comportement commun des fonds */
 .tab-bg-1,
 .tab-bg-2,
 .tab-bg-3,
@@ -27,7 +39,65 @@
     -fx-background-repeat: no-repeat;
 }
 
-/* Lisibilité (optionnel mais recommandé) */
+/* Overlay de lisibilité */
 .overlay {
     -fx-background-color: rgba(0, 0, 0, 0.35);
+}
+
+/* =========================================================
+   BARRE D’ONGLETS (HEADERS)
+   ========================================================= */
+
+/* Fond général */
+.tab-pane .tab-header-area {
+    -fx-background-color: transparent;
+}
+
+/* Style commun à tous les onglets
+.tab-pane .tab {
+    -fx-background-radius: 6 6 0 0;
+    -fx-padding: 6 14 6 14;
+    -fx-font-size: 13px;
+}*/
+
+/* =========================================================
+   COULEURS PAR ONGLET (via styleClass dans le FXML)
+   ========================================================= */
+
+.tab-pane .tab.tab-header-1 {
+    -fx-background-color: #538BCA; /* bleu clair */
+}
+
+.tab-pane .tab.tab-header-2 {
+    -fx-background-color: #4EE03E; /* vert clair */
+}
+
+.tab-pane .tab.tab-header-3 {
+    -fx-background-color: #D9D445; /* jaune clair */
+}
+
+.tab-pane .tab.tab-header-4 {
+    -fx-background-color: #FF1FE1; /* rose clair */
+}
+
+.tab-pane .tab.tab-header-5 {
+    -fx-background-color: #AD1FFF; /* violet clair */
+}
+
+.tab-pane .tab.tab-header-6 {
+    -fx-background-color: #2DF0D3; /* cyan clair */
+}
+
+/* =========================================================
+   ONGLET SÉLECTIONNÉ
+   ========================================================= */
+
+.tab-pane .tab:selected {
+    -fx-background-color: white;
+    -fx-font-weight: bold;
+}
+
+/* Texte de l’onglet sélectionné */
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: #000000;
 }
