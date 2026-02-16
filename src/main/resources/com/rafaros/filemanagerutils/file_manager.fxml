@@ -14,6 +14,7 @@
 <?import javafx.scene.layout.Pane?>
 
 
+<?import javafx.scene.control.ProgressBar?>
 <TabPane xmlns:fx="http://javafx.com/fxml/1"
          fx:controller="com.rafaros.filemanagerutils.FileManagerController">
 
@@ -38,7 +39,7 @@
 
 
     <Tab text="Pics FileList Generator">
-        <StackPane styleClass="tab-bg-1">
+        <StackPane styleClass="tab-bg-2">
         <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER"
@@ -62,7 +63,7 @@
 
     <!-- 🔹 NOUVEL ONGLET -->
     <Tab text="File List Strate Moving">
-        <StackPane styleClass="tab-bg-1">
+        <StackPane styleClass="tab-bg-3">
         <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="12" alignment="CENTER" prefWidth="400" prefHeight="300">
@@ -105,7 +106,7 @@
 
 
     <Tab text="Rename by FolderName">
-        <StackPane styleClass="tab-bg-1">
+        <StackPane styleClass="tab-bg-4">
         <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER">
@@ -127,8 +128,52 @@
         </StackPane>
     </Tab>
 
+    <!-- 🔹 NEW TAB : Folder Content Distributor -->
+    <Tab text="Folder Content Distributor">
+        <StackPane styleClass="tab-bg-5">
+            <Pane styleClass="overlay"/>
+
+            <AnchorPane>
+                <VBox spacing="12"
+                      alignment="CENTER"
+                      AnchorPane.topAnchor="20"
+                      AnchorPane.leftAnchor="20"
+                      AnchorPane.rightAnchor="20">
+
+                    <Label text="Distribute files evenly into subfolders"/>
+
+                    <Button text="Select Folder"
+                            onAction="#handleSelectDistributionFolder"/>
+
+                    <TextField fx:id="distributionFolderField"
+                               editable="false"
+                               promptText="No folder selected"/>
+
+                    <HBox spacing="10" alignment="CENTER">
+                        <Label text="Number of subdivisions:"/>
+                        <TextField fx:id="subdivisionCountField"
+                                   prefWidth="80"/>
+                    </HBox>
+
+                    <Button text="Start Distribution"
+                            onAction="#handleStartDistribution"/>
+
+                    <ProgressBar fx:id="distributionProgressBar"
+                                 prefWidth="300"
+                                 progress="0"/>
+
+                    <Label fx:id="distributionStatusLabel"
+                           text="Status: Waiting"/>
+
+                </VBox>
+            </AnchorPane>
+        </StackPane>
+    </Tab>
+
+
+
     <Tab text="Repair Corrupted Images">
-        <StackPane styleClass="tab-bg-1">
+        <StackPane styleClass="tab-bg-6">
         <Pane styleClass="overlay"/>
         <AnchorPane>
             <VBox spacing="10" alignment="CENTER"
@@ -144,5 +189,7 @@
         </AnchorPane>
         </StackPane>
     </Tab>
+
+
 
 </TabPane>

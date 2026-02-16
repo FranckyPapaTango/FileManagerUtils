@@ -20,7 +20,8 @@
 .tab-bg-2,
 .tab-bg-3,
 .tab-bg-4,
-.tab-bg-5 {
+.tab-bg-5,
+.tab-bg-6 {
     -fx-background-size: cover;
     -fx-background-position: center;
     -fx-background-repeat: no-repeat;

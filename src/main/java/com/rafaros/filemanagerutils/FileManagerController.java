@@ -1,11 +1,9 @@
 package com.rafaros.filemanagerutils;
 
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -52,6 +50,27 @@ public class FileManagerController {
 
     @FXML
     private Label statusLabel;
+
+    @FXML
+    private TextField distributionFolderField;
+
+    @FXML
+    private TextField subdivisionCountField;
+
+    @FXML
+    private Label totalFilesLabel;
+
+    @FXML
+    private Label filesPerFolderLabel;
+
+    @FXML
+    private Label remainingFilesLabel;
+
+    @FXML
+    private Label distributionStatusLabel;
+
+    @FXML private Button startDistributionButton;
+
 
     private File selectedDirectory2; // pour la fonctionnalité de génération .txt de liste de fullpathname de fichier d'images
 
@@ -322,6 +341,14 @@ public class FileManagerController {
 
     @FXML
     private Button moveFilesButton;
+
+
+    @FXML
+    private ProgressBar distributionProgressBar;
+
+
+    private File distributionRootFolder;
+
 
 
     @FXML
@@ -896,6 +923,114 @@ public class FileManagerController {
                 });
             }
         }).start();
+    }
+
+    @FXML
+    private void handleSelectDistributionFolder() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Select Folder to Distribute");
+
+        File folder = chooser.showDialog(null);
+        if (folder != null && folder.isDirectory()) {
+            distributionRootFolder = folder;
+            distributionFolderField.setText(folder.getAbsolutePath());
+        }
+    }
+
+
+    @FXML
+    private void handleStartDistribution() {
+
+        if (distributionRootFolder == null) {
+            distributionStatusLabel.setText("Status: No folder selected");
+            return;
+        }
+
+        int n;
+        try {
+            n = Integer.parseInt(subdivisionCountField.getText());
+            if (n <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            distributionStatusLabel.setText("Status: Invalid subdivision number");
+            return;
+        }
+
+        File[] files = distributionRootFolder.listFiles(File::isFile);
+        if (files == null || files.length == 0) {
+            distributionStatusLabel.setText("Status: No files to distribute");
+            return;
+        }
+
+        int nc = files.length;
+        int filesPerFolder = nc / n;
+
+        distributionProgressBar.setProgress(0);
+        distributionStatusLabel.setText("Status: Processing...");
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+
+                List<Path> movedFiles = new ArrayList<>();
+                List<Path> createdDirs = new ArrayList<>();
+
+                try {
+                    int index = 0;
+
+                    for (int i = 1; i <= n; i++) {
+                        Path subDir = distributionRootFolder.toPath().resolve(String.valueOf(i));
+                        Files.createDirectories(subDir);
+                        createdDirs.add(subDir);
+
+                        for (int j = 0; j < filesPerFolder; j++) {
+                            if (index >= files.length) break;
+
+                            Path source = files[index].toPath();
+                            Path target = subDir.resolve(source.getFileName());
+
+                            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                            movedFiles.add(target);
+
+                            index++;
+                            updateProgress(index, filesPerFolder * n);
+                        }
+                    }
+
+                } catch (Exception ex) {
+                    // 🔄 ROLLBACK
+                    for (Path p : movedFiles) {
+                        Path rollbackTarget =
+                                distributionRootFolder.toPath().resolve(p.getFileName());
+                        try {
+                            Files.move(p, rollbackTarget, StandardCopyOption.REPLACE_EXISTING);
+                        } catch (IOException ignored) {}
+                    }
+
+                    for (Path dir : createdDirs) {
+                        try {
+                            Files.deleteIfExists(dir);
+                        } catch (IOException ignored) {}
+                    }
+
+                    throw ex;
+                }
+
+                return null;
+            }
+        };
+
+        distributionProgressBar.progressProperty().bind(task.progressProperty());
+
+        task.setOnSucceeded(e ->
+                distributionStatusLabel.setText(
+                        "Status: Done (" + filesPerFolder + " files per folder)")
+        );
+
+        task.setOnFailed(e ->
+                distributionStatusLabel.setText("Status: Error – rollback completed")
+        );
+
+        new Thread(task).start();
     }
 
 
