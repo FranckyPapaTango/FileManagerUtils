@@ -15,14 +15,12 @@ java {
 }
 
 dependencies {
-    // ⚡ JavaFX : uniquement pour compilation (compileOnly) et runtime (runtimeOnly)
-    def javafxVersion = '17.0.18'
+    // ⚡ JavaFX : uniquement pour compilation et runtime
     def javafxPath = 'C:/javafx/javafx-sdk-17.0.18/lib'
-
     compileOnly fileTree(dir: javafxPath, include: '*.jar')
     runtimeOnly fileTree(dir: javafxPath, include: '*.jar')
 
-    // Autres dépendances classiques
+    // Dépendances classiques
     implementation 'com.github.almasb:fxgl:11.17'
     implementation 'eu.hansolo:tilesfx:11.48'
     implementation 'org.kordamp.ikonli:ikonli-javafx:12.3.0'
@@ -38,11 +36,11 @@ application {
 }
 
 /* ==============================
-   FatJar incluant classes + dépendances non-JavaFX
+   FatJar : inclut classes + dépendances non-JavaFX
 ============================== */
 tasks.register('fatJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
     archiveClassifier.set('all')
-    mergeServiceFiles() // fusion services META-INF si nécessaire
+    mergeServiceFiles() // fusion META-INF/services si nécessaire
 
     from sourceSets.main.output
     configurations = [project.configurations.runtimeClasspath]
@@ -52,22 +50,16 @@ tasks.register('fatJar', com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
                 'Main-Class': 'com.rafaros.filemanagerutils.FileManagerUtils',
                 'Implementation-Vendor': 'Rafaros-IT',
                 'Implementation-Title': 'FileManagerUtils',
-                'Implementation-Version': project.version // ✅ remplace version
+                'Implementation-Version': project.version
         )
     }
-
-
 }
 
 /* ==============================
-   Batch Windows pour exécuter le jar avec JavaFX externe
-============================== */
-/* ==============================
-   Batch Windows pour exécuter le jar avec JavaFX
-   ⚡ Le fichier .cmd sera créé automatiquement après fatJar
+   Batch Windows pour lancer le jar avec JavaFX externe
 ============================== */
 tasks.register('createBat') {
-    dependsOn 'fatJar' // ⚡ lien automatique après le FatJar
+    dependsOn 'fatJar'
     doLast {
         def batContent = '''@echo off
 java --module-path "C:\\javafx\\javafx-sdk-17.0.18\\lib" ^
@@ -81,26 +73,21 @@ pause
     }
 }
 
-/* ==============================
-   ⚡ On peut lier la création du bat à fatJar pour l’automatiser
-============================== */
 tasks.named('fatJar') {
-    finalizedBy 'createBat' // après fatJar, créer le .cmd automatiquement
+    finalizedBy 'createBat'
 }
 
 /* ==============================
-   jpackage pour produire l'EXE-installeur
-   ⚡ JavaFX est fourni depuis le SDK externe
+   jpackage : EXE installable
+   ⚡ JavaFX externe fourni via module-path
 ============================== */
 tasks.register('jpackageInstaller', Exec) {
     dependsOn 'fatJar'
     group = 'distribution'
     description = 'Créer l’EXE installable avec jpackage'
 
-    // Chemin du FatJar
     def fatJarPath = tasks.named('fatJar').get().archiveFile.get().asFile.absolutePath
 
-    // Commande jpackage
     commandLine 'jpackage',
             '--input', file('build/libs').absolutePath,
             '--name', 'FileManagerUtils',
@@ -110,13 +97,22 @@ tasks.register('jpackageInstaller', Exec) {
             '--type', 'exe',
             '--win-shortcut',
             '--win-menu',
-            '--vendor', 'Rafaros-IT', // <-- mention du développeur ici
+            '--vendor', 'Rafaros-IT',
             '--java-options', '--module-path "C:\\javafx\\javafx-sdk-17.0.18\\lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics'
+}
 
+// ⚡ Configure la task run pour JavaFX externe
+tasks.named('run', JavaExec) {
+    // Indique le module-path vers JavaFX
+    def javafxPath = 'C:/javafx/javafx-sdk-17.0.18/lib'
+    jvmArgs = [
+            '--module-path', javafxPath,
+            '--add-modules', 'javafx.controls,javafx.fxml,javafx.graphics'
+    ]
 }
 
 /* ==============================
-   Instructions de build
+   Développement / build workflow
 ============================== */
 /*
 1️⃣ Nettoyer caches et ancien build :
@@ -139,7 +135,6 @@ tasks.register('jpackageInstaller', Exec) {
    .\gradlew createBat
    Double-cliquer sur build/libs/FileManagerUtils.cmd pour lancer l’app
 
-5️⃣ Générer l’EXE avec jpackage :
+6️⃣ Générer l’EXE installable via jpackage :
    .\gradlew jpackageInstaller
-
 */
