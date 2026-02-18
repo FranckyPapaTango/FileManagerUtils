@@ -25,6 +25,7 @@ import org.apache.commons.imaging.ImageReadException;
 
 import java.nio.file.attribute.BasicFileAttributes;
 import java.io.IOException;
+import java.util.Objects;
 
 
 
@@ -937,10 +938,8 @@ public class FileManagerController {
         }
     }
 
-
     @FXML
     private void handleStartDistribution() {
-
         if (distributionRootFolder == null) {
             distributionStatusLabel.setText("Status: No folder selected");
             return;
@@ -961,74 +960,136 @@ public class FileManagerController {
             return;
         }
 
-        int nc = files.length;
-        int filesPerFolder = nc / n;
-
+        int totalFiles = files.length;
         distributionProgressBar.setProgress(0);
         distributionStatusLabel.setText("Status: Processing...");
 
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-
                 List<Path> movedFiles = new ArrayList<>();
                 List<Path> createdDirs = new ArrayList<>();
 
                 try {
                     int index = 0;
-
-                    for (int i = 1; i <= n; i++) {
-                        Path subDir = distributionRootFolder.toPath().resolve(String.valueOf(i));
-                        Files.createDirectories(subDir);
-                        createdDirs.add(subDir);
-
-                        for (int j = 0; j < filesPerFolder; j++) {
-                            if (index >= files.length) break;
+                    while (index < totalFiles) {
+                        for (int i = 1; i <= n && index < totalFiles; i++, index++) {
+                            Path subDir = distributionRootFolder.toPath().resolve(String.valueOf(i));
+                            if (!Files.exists(subDir)) {
+                                Files.createDirectories(subDir);
+                                createdDirs.add(subDir);
+                            }
 
                             Path source = files[index].toPath();
                             Path target = subDir.resolve(source.getFileName());
-
                             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
                             movedFiles.add(target);
 
-                            index++;
-                            updateProgress(index, filesPerFolder * n);
+                            updateProgress(index + 1, totalFiles);
                         }
                     }
-
                 } catch (Exception ex) {
                     // 🔄 ROLLBACK
                     for (Path p : movedFiles) {
-                        Path rollbackTarget =
-                                distributionRootFolder.toPath().resolve(p.getFileName());
                         try {
-                            Files.move(p, rollbackTarget, StandardCopyOption.REPLACE_EXISTING);
+                            Files.move(p, distributionRootFolder.toPath().resolve(p.getFileName()),
+                                    StandardCopyOption.REPLACE_EXISTING);
                         } catch (IOException ignored) {}
                     }
-
                     for (Path dir : createdDirs) {
                         try {
-                            Files.deleteIfExists(dir);
+                            if (Files.isDirectory(dir) && Objects.requireNonNull(dir.toFile().list()).length == 0) {
+                                Files.deleteIfExists(dir);
+                            }
                         } catch (IOException ignored) {}
                     }
-
                     throw ex;
                 }
-
                 return null;
             }
         };
 
+        distributionProgressBar.progressProperty().unbind();
         distributionProgressBar.progressProperty().bind(task.progressProperty());
 
-        task.setOnSucceeded(e ->
-                distributionStatusLabel.setText(
-                        "Status: Done (" + filesPerFolder + " files per folder)")
-        );
+        task.setOnSucceeded(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(1);
+            distributionStatusLabel.setText("Status: Done – " + totalFiles + " files distributed");
+        });
 
-        task.setOnFailed(e ->
-                distributionStatusLabel.setText("Status: Error – rollback completed")
-        );
+        task.setOnFailed(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(0);
+            distributionStatusLabel.setText("Status: Error – rollback completed");
+        });
+
+        new Thread(task).start();
+    }
+
+    @FXML
+    private void handleMergeSubfolders() {
+        if (distributionRootFolder == null) {
+            distributionStatusLabel.setText("Status: No folder selected");
+            return;
+        }
+
+        File[] subDirs = distributionRootFolder.listFiles(File::isDirectory);
+        if (subDirs == null || subDirs.length == 0) {
+            distributionStatusLabel.setText("Status: No subfolders to merge");
+            return;
+        }
+
+        distributionProgressBar.setProgress(0);
+        distributionStatusLabel.setText("Status: Merging...");
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                List<Path> movedFiles = new ArrayList<>();
+                int totalFiles = 0;
+
+                for (File dir : subDirs) {
+                    totalFiles += Objects.requireNonNull(dir.listFiles(File::isFile)).length;
+                }
+                int processed = 0;
+
+                for (File dir : subDirs) {
+                    File[] filesInDir = dir.listFiles(File::isFile);
+                    if (filesInDir == null) continue;
+
+                    for (File file : filesInDir) {
+                        Path target = distributionRootFolder.toPath().resolve(file.getName());
+                        Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+                        movedFiles.add(target);
+                        processed++;
+                        updateProgress(processed, totalFiles);
+                    }
+
+                    // Supprimer le sous-dossier s'il est vide et ne contient pas de sous-dossiers
+                    File[] remaining = dir.listFiles();
+                    if (remaining == null || remaining.length == 0) {
+                        Files.deleteIfExists(dir.toPath());
+                    }
+                }
+                return null;
+            }
+        };
+
+        distributionProgressBar.progressProperty().unbind();
+        distributionProgressBar.progressProperty().bind(task.progressProperty());
+
+        task.setOnSucceeded(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(1);
+            distributionStatusLabel.setText("Status: Merge completed");
+        });
+
+        task.setOnFailed(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(0);
+            distributionStatusLabel.setText("Status: Error during merge");
+        });
 
         new Thread(task).start();
     }

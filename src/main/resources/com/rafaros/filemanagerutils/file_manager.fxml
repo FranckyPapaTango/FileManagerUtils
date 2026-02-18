@@ -184,6 +184,10 @@
                     <Button text="Start Distribution"
                             onAction="#handleStartDistribution"/>
 
+                    <Button text="Merge Subfolders Content"
+                            onAction="#handleMergeSubfolders"/>
+
+
                     <ProgressBar fx:id="distributionProgressBar"
                                  prefWidth="300"
                                  progress="0"/>
