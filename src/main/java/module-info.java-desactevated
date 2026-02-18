@@ -2,7 +2,7 @@ module com.rafaros.filemanagerutils {
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.web;
-
+    requires javafx.graphics; // obligatoire pour FXGL
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;
     requires org.kordamp.ikonli.javafx;
@@ -10,12 +10,9 @@ module com.rafaros.filemanagerutils {
     requires eu.hansolo.tilesfx;
     requires com.almasb.fxgl.all;
     requires java.desktop;
+    requires org.apache.commons.imaging;
 
-
-    requires org.apache.commons.imaging; // Ajoutez cette ligne
-
-    opens com.rafaros.filemanagerutils to javafx.fxml;
+    // ouverture nécessaire pour FXGL et FXML
+    opens com.rafaros.filemanagerutils to javafx.fxml, com.almasb.fxgl.all;
     exports com.rafaros.filemanagerutils;
-
-
 }

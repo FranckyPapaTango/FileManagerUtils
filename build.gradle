@@ -1,124 +1,145 @@
 plugins {
     id 'java'
     id 'application'
-    id 'org.openjfx.javafxplugin' version '0.0.10'
-    id 'com.github.johnrengelman.shadow' version '6.1.0'
-    id 'org.beryx.jlink' version '2.24.1'
-    id 'edu.sc.seis.launch4j' version '2.4.7' // facultatif
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
 
-group 'com.rafaros'
-version '1.0-SNAPSHOT'
+group = 'com.rafaros'
+version = '1.0.0'
 
-repositories {
-    mavenCentral()
-}
+repositories { mavenCentral() }
 
-ext {
-    junitVersion = '5.8.2'
-    javafxSdk = 'C:/javafx/javafx-sdk-11.0.2'
-}
-
-sourceCompatibility = '11'
-targetCompatibility = '11'
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-javafx {
-    version = '11.0.2'
-    modules = ['javafx.controls', 'javafx.fxml', 'javafx.web', 'javafx.media']
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 dependencies {
+    // ⚡ JavaFX : uniquement pour compilation (compileOnly) et runtime (runtimeOnly)
+    def javafxVersion = '17.0.18'
+    def javafxPath = 'C:/javafx/javafx-sdk-17.0.18/lib'
+
+    compileOnly fileTree(dir: javafxPath, include: '*.jar')
+    runtimeOnly fileTree(dir: javafxPath, include: '*.jar')
+
+    // Autres dépendances classiques
+    implementation 'com.github.almasb:fxgl:11.17'
+    implementation 'eu.hansolo:tilesfx:11.48'
+    implementation 'org.kordamp.ikonli:ikonli-javafx:12.3.0'
     implementation 'org.controlsfx:controlsfx:11.1.1'
     implementation 'com.dlsc.formsfx:formsfx-core:11.3.2'
     implementation 'net.synedra:validatorfx:0.3.1'
-    implementation 'org.kordamp.ikonli:ikonli-javafx:12.3.0'
     implementation 'org.kordamp.bootstrapfx:bootstrapfx-core:0.4.0'
-    implementation 'eu.hansolo:tilesfx:11.48'
-    implementation 'com.github.almasb:fxgl:11.17'
     implementation 'org.apache.commons:commons-imaging:1.0-alpha2'
-
-    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
 }
 
 application {
     mainClass = 'com.rafaros.filemanagerutils.FileManagerUtils'
-    mainClassName = 'com.rafaros.filemanagerutils.FileManagerUtils'
 }
 
-tasks.withType(Test) {
-    useJUnitPlatform()
-}
+/* ==============================
+   FatJar incluant classes + dépendances non-JavaFX
+============================== */
+tasks.register('fatJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveClassifier.set('all')
+    mergeServiceFiles() // fusion services META-INF si nécessaire
 
-shadowJar {
-    archiveBaseName.set('FileManagerUtils')
-    archiveClassifier.set('')
-    archiveVersion.set('')
+    from sourceSets.main.output
+    configurations = [project.configurations.runtimeClasspath]
+
     manifest {
         attributes(
-                'Main-Class': application.mainClass
+                'Main-Class': 'com.rafaros.filemanagerutils.FileManagerUtils',
+                'Implementation-Vendor': 'Rafaros-IT',
+                'Implementation-Title': 'FileManagerUtils',
+                'Implementation-Version': project.version // ✅ remplace version
         )
     }
-    mergeServiceFiles()
+
+
 }
 
-tasks.build {
-    dependsOn shadowJar
+/* ==============================
+   Batch Windows pour exécuter le jar avec JavaFX externe
+============================== */
+/* ==============================
+   Batch Windows pour exécuter le jar avec JavaFX
+   ⚡ Le fichier .cmd sera créé automatiquement après fatJar
+============================== */
+tasks.register('createBat') {
+    dependsOn 'fatJar' // ⚡ lien automatique après le FatJar
+    doLast {
+        def batContent = '''@echo off
+java --module-path "C:\\javafx\\javafx-sdk-17.0.18\\lib" ^
+     --add-modules javafx.controls,javafx.fxml,javafx.graphics ^
+     -jar "%~dp0\\FileManagerUtils-1.0.0-all.jar"
+pause
+'''
+        def batFile = file('build/libs/FileManagerUtils.cmd')
+        batFile.text = batContent
+        println "✅ FileManagerUtils.cmd créé dans build/libs"
+    }
 }
 
-// -----------------------------
-// Installer Windows avec jpackage
-// -----------------------------
+/* ==============================
+   ⚡ On peut lier la création du bat à fatJar pour l’automatiser
+============================== */
+tasks.named('fatJar') {
+    finalizedBy 'createBat' // après fatJar, créer le .cmd automatiquement
+}
+
+/* ==============================
+   jpackage pour produire l'EXE-installeur
+   ⚡ JavaFX est fourni depuis le SDK externe
+============================== */
 tasks.register('jpackageInstaller', Exec) {
-    group = "distribution"
-    description = "Génère l'installateur Windows (.exe)"
+    dependsOn 'fatJar'
+    group = 'distribution'
+    description = 'Créer l’EXE installable avec jpackage'
 
-    dependsOn shadowJar
+    // Chemin du FatJar
+    def fatJarPath = tasks.named('fatJar').get().archiveFile.get().asFile.absolutePath
 
-    commandLine(
-            "C:/Program Files/Java/jdk-17/bin/jpackage.exe",
+    // Commande jpackage
+    commandLine 'jpackage',
+            '--input', file('build/libs').absolutePath,
+            '--name', 'FileManagerUtils',
+            '--main-jar', fatJarPath,
+            '--main-class', 'com.rafaros.filemanagerutils.FileManagerUtils',
+            '--icon', file('src/main/resources/logo/File-Manager.ico').absolutePath,
+            '--type', 'exe',
+            '--win-shortcut',
+            '--win-menu',
+            '--vendor', 'Rafaros-IT', // <-- mention du développeur ici
+            '--java-options', '--module-path "C:\\javafx\\javafx-sdk-17.0.18\\lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics'
 
-            "--type", "exe",
-            "--name", "FileManagerUtils",
-
-            "--input", "${buildDir}/libs",
-            "--main-jar", "FileManagerUtils.jar",
-            "--main-class", "com.rafaros.filemanagerutils.FileManagerUtils",
-
-            // Java options
-            "--java-options", "-Xmx256m",
-
-            // Module-path pour JavaFX
-            "--module-path", "${javafxSdk}/lib",
-            "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.media",
-
-            "--icon", "src/main/resources/logo/File-Manager.ico",
-            "--dest", "${buildDir}/installer",
-
-            "--win-menu",
-            "--win-shortcut",
-
-            "--vendor", "Rafaros",
-            "--app-version", "1.0.0"
-
-            // "--win-console" // Décommenter pour debug si l'application ne s'ouvre pas
-    )
 }
 
-//----------------------------------------------------/
-//fenêtre gradle de droite :
-//----------------------------------------------------/
-//          build=>clean
-//          build=>build
-//----------------------------------------------------/
-//Pour lancer l'application (mode dev) :
-//----------------------------------------------------/
-//          application=>run
-//----------------------------------------------------/
-//pour produire le jar executable installeur :
-//----------------------------------------------------/
-//          distribution=>jpackageInstaller
+/* ==============================
+   Instructions de build
+============================== */
+/*
+1️⃣ Nettoyer caches et ancien build :
+   .\gradlew --stop
+   Remove-Item build, .gradle -Recurse -Force
+
+2️⃣ Vérifier JAVA_HOME vers Java 17
+   $env:JAVA_HOME="C:\Users\mashk\.sdkman\candidates\java\17.0.8-zulu"
+   $env:PATH="$env:JAVA_HOME\bin;$env:PATH"
+   java -version
+
+3️⃣ Générer FatJar
+   .\gradlew fatJar
+   Vérifier que le Jar fait plusieurs Mo
+
+4️⃣ Lancer le FatJar avec JavaFX
+   java --module-path "C:\javafx\javafx-sdk-17.0.18\lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics -jar build/libs/FileManagerUtils-1.0.0-all.jar
+
+5️⃣ Créer batch Windows pratique
+   .\gradlew createBat
+   Double-cliquer sur build/libs/FileManagerUtils.cmd pour lancer l’app
+
+5️⃣ Générer l’EXE avec jpackage :
+   .\gradlew jpackageInstaller
+
+*/
