@@ -1,5 +1,6 @@
 package com.rafaros.filemanagerutils;
 
+import com.rafaros.filemanagerutils.service.FileExtensionService;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.ParallelTransition;
@@ -33,6 +34,7 @@ import java.io.IOException;
 public class FileManagerController {
 
 
+    @FXML
     private TextField extensionField;
 
     @FXML
@@ -88,26 +90,54 @@ public class FileManagerController {
         selectedFiles = fileChooser.showOpenMultipleDialog(new Stage());
     }
 
+
+
+private final FileExtensionService fileExtensionService = new FileExtensionService();
+
+
     @FXML
     private void handleProceed() {
+
+        if (extensionField == null) {
+            showFxAlert(Alert.AlertType.ERROR, "Configuration error",
+                    "extensionField not injected", "Check fx:id=\"extensionField\" in FXML.");
+            return;
+        }
+
         if (selectedFiles == null || selectedFiles.isEmpty()) {
-            showMessage("No files selected", "Error");
+            showFxAlert(Alert.AlertType.WARNING, "No files selected", null, "Please select files first.");
             return;
         }
 
         String newExtension = extensionField.getText().trim();
         if (newExtension.isEmpty()) {
-            showMessage("Extension field is empty", "Error");
+            showFxAlert(Alert.AlertType.WARNING, "Invalid extension", null, "Extension field is empty.");
             return;
         }
 
-        boolean success = changeFilesExtension(selectedFiles, newExtension);
-        if (success) {
-            showMessage("Success!", "Information");
-        } else {
-            showMessage("An error occurred", "Error");
-        }
+        boolean success = fileExtensionService.changeFilesExtension(selectedFiles, newExtension);
+
+        showFxAlert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR,
+                "Extension change",
+                null,
+                success ? "Extensions updated successfully." : "An error occurred.");
     }
+
+
+    private void showFxAlert(Alert.AlertType alertType, String title, String headerText, String contentText) {
+        // S'assurer que le code est exécuté sur le thread JavaFX
+        Platform.runLater(() -> {
+            Alert alert = new Alert(alertType);
+            alert.setTitle(title != null ? title : "Alert");
+            alert.setHeaderText(headerText); // peut être null
+            alert.setContentText(contentText != null ? contentText : "");
+            alert.showAndWait();
+        });
+    }
+
+
+
+
 
     @FXML
     private void handleSelectDirectory() {
@@ -463,8 +493,8 @@ public class FileManagerController {
                     if (!Files.exists(filePath)) continue;
 
                     String fileName = filePath.getFileName().toString();
-                    String baseName = getFileNameWithoutExtension(fileName);
-                    String ext = getFileExtension(fileName);
+                    String baseName = fileExtensionService.getFileNameWithoutExtension(fileName);
+                    String ext = fileExtensionService.getFileExtension(fileName);
 
                     // 🔹 Chaque fichier a son propre dossier parent basé sur son nom nettoyé
                     String cleanFolderName = cleanName(fileName);
@@ -513,7 +543,7 @@ public class FileManagerController {
      * Nettoie le nom du fichier pour générer un nom de dossier valide.
      */
     private String cleanName(String fileName) {
-        String name = getFileNameWithoutExtension(fileName).trim();
+        String name = fileExtensionService.getFileNameWithoutExtension(fileName).trim();
         boolean changed;
         do {
             String before = name;
@@ -545,34 +575,6 @@ public class FileManagerController {
 
 
 
-
-    /*
-    */
-/**
-     * Renvoie le nom du fichier sans extension.
-     *//*
-
-    private String getFileNameWithoutExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
-    }
-
-    */
-/**
-     * Renvoie l'extension avec le point, ex: ".png"
-     *//*
-
-    private String getFileExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
-    }
-*/
-
-
-
-
-
-
     private boolean repairImage(File imageFile) {
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(
@@ -588,30 +590,9 @@ public class FileManagerController {
         }
     }
 
-    private boolean changeFilesExtension(List<File> files, String newExtension) {
-        try {
-            for (File file : files) {
-                Path source = file.toPath();
-                String newFileName = getFileNameWithoutExtension(file) + "." + newExtension;
-                Files.move(source, source.resolveSibling(newFileName));
-            }
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
 
-    // --- surcharge pour String ---
-    private String getFileNameWithoutExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
-    }
 
-    // --- garde les versions pour File ---
-    private String getFileNameWithoutExtension(File file) {
-        return getFileNameWithoutExtension(file.getName());
-    }
+
 
     private void showMessage(String message, String title) {
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, message, title, JOptionPane.INFORMATION_MESSAGE));
@@ -675,16 +656,6 @@ public class FileManagerController {
 //        }
 //    }
 
-    private String getFileExtension(File file) {
-        String fileName = file.getName();
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
-    }
-    // --- surcharge pour String ---
-    private String getFileExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
-    }
 
 
 // ---------------------------
@@ -732,7 +703,7 @@ public class FileManagerController {
             if (file.isDirectory()) {
                 renameFilesRecursively(file);
             } else {
-                String newFileName = directory.getName() + getFileExtension(file);
+                String newFileName = directory.getName() + fileExtensionService.getFileExtension(file);
 
                 Path source = file.toPath();
                 Path target;
@@ -745,8 +716,8 @@ public class FileManagerController {
 
                 // Gestion des collisions de fichiers
                 int counter = 1;
-                String nameWithoutExt = getFileNameWithoutExtension(newFileName);
-                String ext = getFileExtension(newFileName);
+                String nameWithoutExt = fileExtensionService.getFileNameWithoutExtension(newFileName);
+                String ext = fileExtensionService.getFileExtension(newFileName);
 
                 while (Files.exists(target)) {
                     String indexedName = nameWithoutExt + "_" + counter + ext;
@@ -827,8 +798,8 @@ public class FileManagerController {
                                         }
 
                                         Path targetFile = targetDir.resolve(file.getFileName());
-                                        String nameWithoutExt = getFileNameWithoutExtension(file.getFileName().toString());
-                                        String ext = getFileExtension(file.getFileName().toString());
+                                        String nameWithoutExt = fileExtensionService.getFileNameWithoutExtension(file.getFileName().toString());
+                                        String ext = fileExtensionService.getFileExtension(file.getFileName().toString());
                                         int counter = 1;
 
                                         while (Files.exists(targetFile)) {
