@@ -136,5 +136,15 @@ tasks.named('run', JavaExec) {
    Double-cliquer sur build/libs/FileManagerUtils.cmd pour lancer l’app
 
 6️⃣ Générer l’EXE installable via jpackage :
-   .\gradlew jpackageInstaller
+
+
+
+ ** D'UN TRAIT (ALL IN ONE) :
+
+ .\gradlew --stop
+   Remove-Item build, .gradle -Recurse -Force
+   .\gradlew fatJar
+ .\gradlew createBat
+ .\gradlew jpackageInstaller
+
 */
