@@ -64,6 +64,10 @@
    COULEURS PAR ONGLET (via styleClass dans le FXML)
    ========================================================= */
 
+.tab-pane .tab.tab-header-0 {
+    -fx-background-color: red; /* bleu clair */
+}
+
 .tab-pane .tab.tab-header-1 {
     -fx-background-color: #538BCA; /* bleu clair */
 }
@@ -100,4 +104,50 @@
 /* Texte de l’onglet sélectionné */
 .tab-pane .tab:selected .tab-label {
     -fx-text-fill: #000000;
+}
+
+
+.presentation-card {
+    -fx-background-color: rgba(0, 0, 0, 0.55);
+    -fx-background-radius: 14;
+    -fx-padding: 28 36 28 36;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 20, 0.3, 0, 6);
+}
+
+.presentation-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+}
+
+.presentation-icon {
+    -fx-font-size: 22px;
+    -fx-background-color: yellow;
+}
+
+.presentation-text1 {
+    -fx-font-size: 16px;
+    -fx-text-fill: #eaeaea;
+    -fx-opacity: 0.95;
+}
+
+.presentation-title2 {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+}
+.presentation-text2 {
+    -fx-font-size: 14px;
+    -fx-text-fill: #e0e0e0;
+    -fx-line-spacing: 4px;
+}
+.presentation-title3 {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+}
+.presentation-text3 {
+    -fx-font-size: 14px;
+    -fx-text-fill: #e0e0e0;
+    -fx-line-spacing: 4px;
 }

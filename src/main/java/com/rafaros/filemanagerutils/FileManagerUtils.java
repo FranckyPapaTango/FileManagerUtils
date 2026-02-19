@@ -16,7 +16,7 @@ public class FileManagerUtils extends Application {
         );
         Parent root = loader.load();
 
-        Scene scene = new Scene(root, 820, 620);
+        Scene scene = new Scene(root, 860, 640);
 
         // 🔥 Chargement du CSS
         scene.getStylesheets().add(

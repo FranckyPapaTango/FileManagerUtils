@@ -18,6 +18,85 @@
 <TabPane xmlns:fx="http://javafx.com/fxml/1"
          fx:controller="com.rafaros.filemanagerutils.FileManagerController">
 
+    <Tab fx:id="presentationTab"
+         text="         "
+         styleClass="tab-header-0"
+         closable="false">
+
+
+
+    <StackPane styleClass="tab-bg-0">
+            <Pane styleClass="overlay"/>
+
+            <AnchorPane>
+                <VBox alignment="CENTER"
+                      AnchorPane.topAnchor="0"
+                      AnchorPane.bottomAnchor="0"
+                      AnchorPane.leftAnchor="0"
+                      AnchorPane.rightAnchor="0">
+
+                    <!-- Carte centrale -->
+                    <VBox spacing="14"
+                          alignment="CENTER"
+                          styleClass="presentation-card"
+                          fx:id="presentationCard">
+
+                        <!-- Titre + icône -->
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="📁" styleClass="presentation-icon"/>
+                            <Label text="Présentation :" styleClass="presentation-title"/>
+                        </HBox>
+
+                        <!-- Texte -->
+                        <Label
+                                text="File Manager est un utilitaire de manipulation 'par lot' de dossiers &amp; fichiers, avec des fonctionnalités diverses très utiles...Ce Logiciel vous offre Productivité : automatise vos tâches répétitives.&#10; &#10;"
+                                wrapText="true"
+                                textAlignment="CENTER"
+                                maxWidth="600"
+                                styleClass="presentation-text1"/>
+
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="📁" styleClass="presentation-icon"/>
+                            <Label text="Concepteur-Développeur :" styleClass="presentation-title2"/>
+                        </HBox>
+
+                        <Label
+                                text=" &#10;
+                                      Sté François Yvon RAFARALAHY (Freelance)&#10;
+                                      SIRET 88966343100019&#10;
+                                      92120 Montrouge - FRANCE&#10;
+                                      Site web : https://www.rafaros-it.fr"
+                                wrapText="true"
+                                textAlignment="LEFT"
+                                maxWidth="600"
+                                styleClass="presentation-text2"/>
+
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="♥" styleClass="presentation-icon"/>
+                            <Label text="Contact :" styleClass="presentation-title3"/>
+                        </HBox>
+
+
+                        <Label
+                                text=" &#10;
+                                      rafaralahyf@gmail.com&#10;
+                                      +33 6 95 09 68 56 (France)&#10;
+                                      +261 (0)32 54 467 71&#10;
+                                       &#10;
+                                      © Copyright 2023 - Sté FYR"
+                                wrapText="true"
+                                textAlignment="LEFT"
+                                maxWidth="600"
+                                styleClass="presentation-text3"/>
+
+                    </VBox>
+                </VBox>
+            </AnchorPane>
+        </StackPane>
+    </Tab>
+
+
+
     <Tab text="File Extension" styleClass="tab-header-1" closable="false">
         <StackPane styleClass="tab-bg-1">
             <Pane styleClass="overlay"/>

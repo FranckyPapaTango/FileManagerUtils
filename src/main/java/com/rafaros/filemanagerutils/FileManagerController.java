@@ -1,9 +1,14 @@
 package com.rafaros.filemanagerutils;
 
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.ParallelTransition;
+import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -12,21 +17,17 @@ import javax.swing.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
+
+import javafx.util.Duration;
 import org.apache.commons.imaging.Imaging;
 import org.apache.commons.imaging.ImageReadException;
 
-import java.nio.file.attribute.BasicFileAttributes;
 import java.io.IOException;
-import java.util.Objects;
-
 
 
 public class FileManagerController {
@@ -354,7 +355,26 @@ public class FileManagerController {
 
     @FXML
     private void initialize() {
+
         moveFilesButton.setDisable(true);
+
+        // état initial invisible
+        presentationCard.setOpacity(0);
+        presentationCard.setTranslateY(20);
+
+        // Animation lors des changements d’onglet
+        presentationTab.setOnSelectionChanged(event -> {
+            if (presentationTab.isSelected()) {
+                playPresentationAnimation();
+            }
+        });
+
+        // 🔥 CAS SPÉCIAL : premier affichage (tab déjà sélectionné)
+        Platform.runLater(() -> {
+            if (presentationTab.isSelected()) {
+                playPresentationAnimation();
+            }
+        });
     }
 
 
@@ -1092,6 +1112,28 @@ public class FileManagerController {
         });
 
         new Thread(task).start();
+    }
+
+    @FXML
+    private VBox presentationCard;
+
+    @FXML
+    private Tab presentationTab;
+
+    private void playPresentationAnimation() {
+
+        FadeTransition fade = new FadeTransition(Duration.millis(1200), presentationCard);
+        fade.setFromValue(0);
+        fade.setToValue(1);
+        fade.setInterpolator(Interpolator.EASE_OUT);
+
+        TranslateTransition slide = new TranslateTransition(Duration.millis(1200), presentationCard);
+        slide.setFromY(20);
+        slide.setToY(0);
+        slide.setInterpolator(Interpolator.EASE_OUT);
+
+        ParallelTransition animation = new ParallelTransition(fade, slide);
+        animation.play();
     }
 
 
