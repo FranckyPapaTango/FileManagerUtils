@@ -112,6 +112,10 @@
                     <Button text="Select Files"
                             onAction="#handleSelectFiles"/>
 
+                    <!--<Button text="Select Folder"
+                            onAction="#handleSelectFolder"/>-->
+
+
                     <Button text="Proceed"
                             onAction="#handleProceed"/>
 
