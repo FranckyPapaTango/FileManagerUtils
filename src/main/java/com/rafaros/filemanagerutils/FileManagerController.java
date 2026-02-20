@@ -121,26 +121,42 @@ public class FileManagerController {
 
     @FXML
     private void handleProceed() {
+        // Vérification des injections FXML
         if (extensionField == null) {
-            showFxAlert(Alert.AlertType.ERROR, "Configuration error", "extensionField not injected",
-                    "Check fx:id=\"extensionField\" in FXML.");
+            showFxAlert(Alert.AlertType.ERROR, "Configuration error",
+                    "extensionField not injected", "Check fx:id=\"extensionField\" in FXML.");
             return;
         }
+
+        // Vérifie que des fichiers sont sélectionnés
         if (selectedFiles == null || selectedFiles.isEmpty()) {
-            showFxAlert(Alert.AlertType.WARNING, "No files selected", null, "Please select files first.");
+            showFxAlert(Alert.AlertType.WARNING, "No files selected", null,
+                    "Please select files first.");
             return;
         }
+
+        // Récupère la nouvelle extension
         String newExtension = extensionField.getText().trim();
         if (newExtension.isEmpty()) {
-            showFxAlert(Alert.AlertType.WARNING, "Invalid extension", null, "Extension field is empty.");
+            showFxAlert(Alert.AlertType.WARNING, "Invalid extension", null,
+                    "Extension field is empty.");
             return;
         }
+
+        // Change l'extension des fichiers via le service
         boolean success = fileExtensionService.changeFilesExtension(selectedFiles, newExtension);
+
+        // Supprime les fichiers originaux si le changement a réussi
+        if (success) {
+            deleteConvertedFiles(selectedFiles); // <-- méthode fidèle à ton post
+        }
+
+        // Affiche un message selon le résultat
         showFxAlert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR,
-                "Extension change",
-                null,
+                "Extension change", null,
                 success ? "Extensions updated successfully." : "An error occurred.");
     }
+
 
     private void showFxAlert(Alert.AlertType alertType, String title, String headerText, String contentText) {
         Platform.runLater(() -> {
@@ -753,5 +769,31 @@ public class FileManagerController {
             distributionFolderField.setText(folder.getAbsolutePath()); // met à jour le TextField
         }
     }
+
+
+    /**
+     * Supprime les fichiers originaux après changement d'extension ou conversion.
+     * Utilisée après handleProceed().
+     */
+    private void deleteConvertedFiles(List<File> files) {
+        if (files == null || files.isEmpty()) return;
+
+        for (File file : files) {
+            try {
+                if (file.exists()) {
+                    boolean deleted = file.delete();
+                    if (!deleted) {
+                        System.err.println("Failed to delete file: " + file.getAbsolutePath());
+                    } else {
+                        System.out.println("Deleted file: " + file.getAbsolutePath());
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error deleting file: " + file.getAbsolutePath());
+                e.printStackTrace();
+            }
+        }
+    }
+
 
 }
