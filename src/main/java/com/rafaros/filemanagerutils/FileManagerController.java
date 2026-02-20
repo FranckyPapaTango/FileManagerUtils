@@ -8,7 +8,6 @@ import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
-import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
@@ -24,73 +23,202 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
+
 import javafx.util.Duration;
 import org.apache.commons.imaging.Imaging;
 import org.apache.commons.imaging.ImageReadException;
 
+import java.io.IOException;
+
+
 public class FileManagerController {
 
-    // ===========================
-    // FXML Variables
-    // ===========================
+
     @FXML
     private TextField extensionField;
+
     @FXML
     private TextField selectedDirectoryField;
+
     @FXML
     private TextField selectedImagesField;
+
     @FXML
     private CheckBox gatherInContainerCheckbox;
+
     @FXML
     private TextField containerNameField;
+
     @FXML
     private Label locationLabel;
+
     @FXML
     private Label statusLabel;
+
     @FXML
     private TextField distributionFolderField;
+
     @FXML
     private TextField subdivisionCountField;
+
     @FXML
     private Label totalFilesLabel;
+
     @FXML
     private Label filesPerFolderLabel;
+
     @FXML
     private Label remainingFilesLabel;
+
     @FXML
     private Label distributionStatusLabel;
-    @FXML
-    private Button startDistributionButton;
-    @FXML
-    private TextField restrictionField;
-    @FXML
-    private TextField destinationField;
-    @FXML
-    private Label strateStatusLabel;
-    @FXML
-    private Button moveFilesButton;
-    @FXML
-    private ProgressBar distributionProgressBar;
-    @FXML
-    private Button cleanFoldersButton;
-    @FXML
-    private Button exportRecycleBinButton;
-    @FXML
-    private VBox presentationCard;
-    @FXML
-    private Tab presentationTab;
 
-    // ===========================
-    // Variables internes
-    // ===========================
-    private File selectedDirectory2;       // pour handleGenerateFilesList
-    private List<File> selectedFiles;
+    @FXML private Button startDistributionButton;
+
+
+    private File selectedDirectory2; // pour la fonctionnalité de génération .txt de liste de fullpathname de fichier d'images
+    private final FileExtensionService fileExtensionService = new FileExtensionService();
+
+    private List<File> selectedFiles = new ArrayList<>();
+
+    // private List<File> selectedFiles;
     private File selectedDirectory;
     private File containerDirectory;
-    private File distributionRootFolder;
-    private Path destinationRoot;
 
-    private final FileExtensionService fileExtensionService = new FileExtensionService();
+    @FXML
+    private TextArea selectedFilesInfo;
+
+    @FXML
+    private void handleSelectFiles() {
+        // RESET total
+        selectedFiles.clear();
+        selectedDirectory = null;
+        selectedFilesInfo.clear();
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Files");
+
+        List<File> files = fileChooser.showOpenMultipleDialog(
+                selectedFilesInfo.getScene().getWindow()
+        );
+
+        if (files != null && !files.isEmpty()) {
+            selectedFiles.addAll(files);
+            // dossier du dernier fichier sélectionné
+            selectedDirectory = files.get(files.size() - 1).getParentFile();
+        }
+
+        updateSelectedFilesInfo();
+    }
+
+
+    @FXML
+    private void handleProceed() {
+        if (selectedFiles == null || selectedFiles.isEmpty()) {
+            showMessage("No files selected", "Error");
+            return;
+        }
+
+        String newExtension = extensionField.getText().trim();
+        if (newExtension.isEmpty()) {
+            showMessage("Extension field is empty", "Error");
+            return;
+        }
+
+        boolean success = fileExtensionService.changeFilesExtension(selectedFiles, newExtension);
+        if (success) {
+            showMessage("Success!", "Information");
+        } else {
+            showMessage("An error occurred", "Error");
+        }
+    }
+
+    @FXML
+    private void handleSelectDirectory() {
+        // RESET total
+        selectedFiles.clear();
+        selectedDirectory = null;
+        selectedFilesInfo.clear();
+
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Directory");
+
+        File dir = directoryChooser.showDialog(
+                selectedFilesInfo.getScene().getWindow()
+        );
+
+        if (dir != null && dir.isDirectory()) {
+            selectedDirectory = dir;
+
+            File[] filesArray = dir.listFiles(File::isFile);
+            if (filesArray != null) {
+                selectedFiles.addAll(List.of(filesArray));
+            }
+        }
+
+        updateSelectedFilesInfo();
+    }
+
+
+    private void updateSelectedFilesInfo() {
+        StringBuilder info = new StringBuilder();
+
+        if (selectedDirectory != null) {
+            info.append("Selected folder:\n")
+                    .append(selectedDirectory.getAbsolutePath())
+                    .append("\n\n");
+        }
+
+        info.append("Number of files selected: ")
+                .append(selectedFiles.size());
+
+        selectedFilesInfo.setText(info.toString());
+    }
+
+
+    @FXML
+    private void handleRenameContent() {
+        if (selectedDirectory == null) {
+            showMessage("No directory selected", "Error");
+            return;
+        }
+
+        if (gatherInContainerCheckbox.isSelected()) {
+            String containerName = containerNameField.getText().trim();
+            while (true) {
+                if (containerName.isEmpty()) {
+                    showMessage("Container name is empty", "Error");
+                    return;
+                }
+                containerDirectory = new File(selectedDirectory, containerName);
+
+                // Vérifie si le répertoire de conteneur existe déjà
+                if (containerDirectory.exists()) {
+                    showMessage("Container directory already exists. Please define a different name.", "Error");
+                    return;
+
+                }
+
+                break;
+
+            }
+        }
+        int confirm = showConfirmDialog("Are you sure you want to rename the content of this directory?", "Confirmation");
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+        // Crée le répertoire de conteneur s'il n'existe pas
+        if (!containerDirectory.mkdirs()) {
+            showMessage("Failed to create container directory", "Error");
+            return;
+        }
+        boolean success = renameFilesInDirectory(selectedDirectory);
+        if (success) {
+            showMessage("Success!", "Information");
+        } else {
+            showMessage("An error occurred", "Error");
+        }
+    }
 
 
 
@@ -102,6 +230,7 @@ public class FileManagerController {
                 new FileChooser.ExtensionFilter("Image Files", "*.jpg", "*.png", "*.bpp")
         );
         selectedFiles = fileChooser.showOpenMultipleDialog(new Stage());
+
         if (selectedFiles != null) {
             StringBuilder fileNames = new StringBuilder();
             for (File file : selectedFiles) {
@@ -111,72 +240,6 @@ public class FileManagerController {
         }
     }
 
-    @FXML
-    private void handleProceed() {
-        // Vérification des injections FXML
-        if (extensionField == null) {
-            showFxAlert(Alert.AlertType.ERROR, "Configuration error",
-                    "extensionField not injected", "Check fx:id=\"extensionField\" in FXML.");
-            return;
-        }
-
-        // Vérifie que des fichiers sont sélectionnés
-        if (selectedFiles == null || selectedFiles.isEmpty()) {
-            showFxAlert(Alert.AlertType.WARNING, "No files selected", null,
-                    "Please select files first.");
-            return;
-        }
-
-        // Récupère la nouvelle extension
-        String newExtension = extensionField.getText().trim();
-        if (newExtension.isEmpty()) {
-            showFxAlert(Alert.AlertType.WARNING, "Invalid extension", null,
-                    "Extension field is empty.");
-            return;
-        }
-
-        // Change l'extension des fichiers via le service
-        boolean success = fileExtensionService.changeFilesExtension(selectedFiles, newExtension);
-
-        // Supprime les fichiers originaux si le changement a réussi
-        if (success) {
-            deleteConvertedFiles(selectedFiles); // <-- méthode fidèle à ton post
-        }
-
-        // Affiche un message selon le résultat
-        showFxAlert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR,
-                "Extension change", null,
-                success ? "Extensions updated successfully." : "An error occurred.");
-    }
-
-
-    private void showFxAlert(Alert.AlertType alertType, String title, String headerText, String contentText) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(alertType);
-            alert.setTitle(title != null ? title : "Alert");
-            alert.setHeaderText(headerText); // peut être null
-            alert.setContentText(contentText != null ? contentText : "");
-            alert.showAndWait();
-        });
-    }
-
-
-    @FXML
-    private void handleChooseLocation() {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Folder");
-        File directory = directoryChooser.showDialog(null);
-        if (directory != null) {
-            selectedDirectory2 = directory;
-            locationLabel.setText("Selected: " + directory.getAbsolutePath());
-        } else {
-            locationLabel.setText("No folder selected");
-        }
-    }
-
-    // ===========================
-    // Gestion des images
-    // ===========================
     @FXML
     private void handleRepairImages() {
         if (selectedFiles != null) {
@@ -203,21 +266,47 @@ public class FileManagerController {
 
     private boolean isImageValid(File imageFile) {
         try {
-            if (ImageIO.read(imageFile) == null) return false;
+            // Try to read the image using ImageIO
+            if (ImageIO.read(imageFile) == null) {
+                return false;
+            }
+
+            // Further validation with Apache Commons Imaging
             try {
-                if (Imaging.getImageInfo(imageFile) == null) return false;
+                if (Imaging.getImageInfo(imageFile) == null) {
+                    return false;
+                }
             } catch (ImageReadException e) {
                 return false;
             }
+
             return true;
         } catch (Exception e) {
             return false;
         }
     }
 
-    // ===========================
-    // Génération des fichiers listés
-    // ===========================
+    /**
+     * Ouvre un sélecteur de dossier pour choisir l'emplacement.
+     */
+    @FXML
+    private void handleChooseLocation() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Folder");
+        File directory = directoryChooser.showDialog(null);
+        if (directory != null) {
+            selectedDirectory2 = directory;
+            locationLabel.setText("Selected: " + directory.getAbsolutePath());
+        } else {
+            locationLabel.setText("No folder selected");
+        }
+    }
+
+    /**
+     * Génère la liste des fichiers et enregistre dans plusieurs fichiers .txt
+     * de 12 000 éléments maximum chacun (filesList_1.txt, filesList_2.txt, ...)
+     * dans un ordre aléatoire.
+     */
     @FXML
     private void handleGenerateFilesList() {
         if (selectedDirectory2 == null) {
@@ -225,15 +314,19 @@ public class FileManagerController {
             return;
         }
 
+        // Récupération et nettoyage de la restriction
         String restriction = restrictionField.getText() != null ? restrictionField.getText().trim() : "";
         boolean hasRestriction = !restriction.isEmpty();
+
         Path outputDir = Paths.get(selectedDirectory2.getAbsolutePath(), "fileList");
 
         try {
+            // Crée le dossier fileList s'il n'existe pas.
             if (!Files.exists(outputDir)) {
                 Files.createDirectories(outputDir);
             }
 
+            // Récupère tous les fichiers avec les extensions spécifiées.
             List<String> filePaths = Files.walk(selectedDirectory2.toPath())
                     .filter(Files::isRegularFile)
                     .map(Path::toString)
@@ -252,13 +345,19 @@ public class FileManagerController {
                 return;
             }
 
+            // Mélange aléatoire de la liste complète
             Collections.shuffle(filePaths, new Random(System.currentTimeMillis()));
-            int MAX_FILES_PER_TXT = 12_000;
+
+            // Taille max d’un fichier
+            final int MAX_FILES_PER_TXT = 12_000;
+
+            // Nombre total de fichiers à générer
             int totalFiles = (int) Math.ceil((double) filePaths.size() / MAX_FILES_PER_TXT);
 
             for (int i = 0; i < totalFiles; i++) {
                 int start = i * MAX_FILES_PER_TXT;
                 int end = Math.min(start + MAX_FILES_PER_TXT, filePaths.size());
+
                 List<String> subList = filePaths.subList(start, end);
 
                 String fileName = String.format("filesList_%d.txt", i + 1);
@@ -266,8 +365,11 @@ public class FileManagerController {
 
                 try (OutputStream outputStream = Files.newOutputStream(outputFile);
                      Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
-                    // Écriture BOM UTF-8
+
+                    // Écriture du BOM UTF-8
                     outputStream.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+
+                    // Écriture des chemins
                     for (String filePath : subList) {
                         writer.write(filePath + System.lineSeparator());
                     }
@@ -275,124 +377,98 @@ public class FileManagerController {
             }
 
             statusLabel.setText(String.format(
-                    "Status: %d randomized file(s) list generated successfully in UTF-8 with BOM!", totalFiles
+                    "Status: %d randomized file(s) list generated successfully in UTF-8 with BOM!",
+                    totalFiles
             ));
-
         } catch (IOException e) {
             e.printStackTrace();
             statusLabel.setText("Status: An error occurred while generating the files list.");
         }
     }
-
-    // ===========================
-    // Renommage des fichiers
-    // ===========================
     @FXML
-    private void handleRenameContent() {
-        if (selectedDirectory == null) {
-            showMessage("No directory selected", "Error");
-            return;
-        }
+    private TextField restrictionField;
 
-        if (gatherInContainerCheckbox.isSelected()) {
-            String containerName = containerNameField.getText().trim();
-            while (true) {
-                if (containerName.isEmpty()) {
-                    showMessage("Container name is empty", "Error");
-                    return;
-                }
-                containerDirectory = new File(selectedDirectory, containerName);
-                if (containerDirectory.exists()) {
-                    showMessage("Container directory already exists. Please define a different name.", "Error");
-                    return;
-                }
-                break;
+
+
+
+
+    @FXML
+    private TextField destinationField;
+
+    @FXML
+    private Label strateStatusLabel;
+
+    @FXML
+    private Button moveFilesButton;
+
+
+    @FXML
+    private ProgressBar distributionProgressBar;
+
+
+    private File distributionRootFolder;
+
+
+
+    @FXML
+    private void initialize() {
+
+        moveFilesButton.setDisable(true);
+
+        // état initial invisible
+        presentationCard.setOpacity(0);
+        presentationCard.setTranslateY(20);
+
+        // Animation lors des changements d’onglet
+        presentationTab.setOnSelectionChanged(event -> {
+            if (presentationTab.isSelected()) {
+                playPresentationAnimation();
             }
-        }
+        });
 
-        int confirm = showConfirmDialog(
-                "Are you sure you want to rename the content of this directory?",
-                "Confirmation"
-        );
-        if (confirm != JOptionPane.YES_OPTION) return;
-
-        if (!containerDirectory.mkdirs()) {
-            showMessage("Failed to create container directory", "Error");
-            return;
-        }
-
-        boolean success = renameFilesInDirectory(selectedDirectory);
-        if (success) {
-            showMessage("Success!", "Information");
-        } else {
-            showMessage("An error occurred", "Error");
-        }
-    }
-
-    private boolean renameFilesInDirectory(File directory) {
-        try {
-            renameFilesRecursively(directory);
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    private void renameFilesRecursively(File directory) throws IOException {
-        File[] files = directory.listFiles();
-        if (files == null) return;
-
-        for (int i = 0; i < files.length; i++) {
-            File file = files[i];
-
-            if (file.isDirectory()) {
-                renameFilesRecursively(file);
-            } else {
-                String newFileName = directory.getName() + fileExtensionService.getFileExtension(file);
-                Path source = file.toPath();
-                Path target;
-
-                if (gatherInContainerCheckbox.isSelected() && containerDirectory != null) {
-                    target = containerDirectory.toPath().resolve(newFileName);
-                } else {
-                    target = source.resolveSibling(newFileName);
-                }
-
-                // Gestion des collisions
-                int counter = 1;
-                String nameWithoutExt = fileExtensionService.getFileNameWithoutExtension(newFileName);
-                String ext = fileExtensionService.getFileExtension(newFileName);
-                while (Files.exists(target)) {
-                    String indexedName = nameWithoutExt + "_" + counter + ext;
-                    target = target.getParent().resolve(indexedName);
-                    counter++;
-                }
-
-                try {
-                    Files.move(source, target);
-                } catch (IOException e) {
-                    System.err.println("Failed to move file: " + source);
-                    e.printStackTrace();
-                }
+        // 🔥 CAS SPÉCIAL : premier affichage (tab déjà sélectionné)
+        Platform.runLater(() -> {
+            if (presentationTab.isSelected()) {
+                playPresentationAnimation();
             }
+        });
+    }
+
+
+
+
+    private Path destinationRoot;
+
+
+
+    @FXML
+    private void handleChooseDestination() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        File dir = chooser.showDialog(null);
+        if (dir != null) {
+            destinationRoot = dir.toPath();
+            destinationField.setText(dir.getAbsolutePath());
+
+            // 🔥 ACTIVER LE BOUTON
+            moveFilesButton.setDisable(false);
         }
     }
 
-    // ===========================
-    // Déplacement des fichiers depuis desktop_2.txt
-    // ===========================
+
     @FXML
     private void handleMoveFiles() {
         if (destinationRoot == null) {
             strateStatusLabel.setText("Status: Please select a destination folder first!");
             return;
         }
+
         moveFilesButton.setDisable(true);
 
         new Thread(() -> {
             try {
+                // 🔥 Chemin du fichier desktop_2.txt
                 Path logPath = Paths.get(System.getProperty("user.home"), "OneDrive", "Desktop", "desktop_2.txt");
+
                 if (!Files.exists(logPath)) {
                     Platform.runLater(() -> {
                         strateStatusLabel.setText("Status: desktop_2.txt not found!");
@@ -401,16 +477,21 @@ public class FileManagerController {
                     return;
                 }
 
+                // 🔥 Lecture UTF-8 avec BOM
                 List<String> restoredFiles = new ArrayList<>();
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(new FileInputStream(logPath.toFile()), StandardCharsets.UTF_8))) {
+
                     String line;
                     while ((line = reader.readLine()) != null) {
                         line = line.trim();
                         if (line.isEmpty()) continue;
+
+                        // Enlever BOM si présent
                         if (restoredFiles.isEmpty() && line.startsWith("\uFEFF")) {
                             line = line.substring(1);
                         }
+
                         restoredFiles.add(line);
                     }
                 }
@@ -424,6 +505,7 @@ public class FileManagerController {
                 }
 
                 int movedCount = 0;
+
                 for (String filePathStr : restoredFiles) {
                     if (filePathStr.startsWith("?")) continue;
 
@@ -441,13 +523,16 @@ public class FileManagerController {
                     String baseName = fileExtensionService.getFileNameWithoutExtension(fileName);
                     String ext = fileExtensionService.getFileExtension(fileName);
 
+                    // 🔹 Chaque fichier a son propre dossier parent basé sur son nom nettoyé
                     String cleanFolderName = cleanName(fileName);
                     if (cleanFolderName.isEmpty()) cleanFolderName = "UNKNOWN";
 
                     Path targetDir = destinationRoot.resolve(cleanFolderName);
                     Files.createDirectories(targetDir);
+
                     Path targetFile = targetDir.resolve(fileName);
 
+                    // 🔹 Gestion des collisions de fichiers dans le même dossier
                     int counter = 1;
                     while (Files.exists(targetFile)) {
                         targetFile = targetDir.resolve(baseName + "_" + counter + ext);
@@ -480,48 +565,110 @@ public class FileManagerController {
         }).start();
     }
 
-    // ===========================
-    // Nettoyage des noms
-    // ===========================
+
+    /**
+     * Nettoie le nom du fichier pour générer un nom de dossier valide.
+     */
     private String cleanName(String fileName) {
         String name = fileExtensionService.getFileNameWithoutExtension(fileName).trim();
         boolean changed;
-
         do {
             String before = name;
+            // 🔹 Supprime (123) en fin
             name = name.replaceAll("\\s*\\(\\d+\\)$", "");
+            // 🔹 Supprime _1, _12, _001 en fin
             name = name.replaceAll("_\\d+$", "");
+            // 🔹 Supprime chiffres collés en FIN de mot
             name = name.replaceAll("(\\p{L})\\d+$", "$1");
+            // 🔹 Supprime chiffres collés en DÉBUT de mot
             name = name.replaceAll("^\\d+(\\p{L})", "$1");
             name = name.trim();
             changed = !name.equals(before);
         } while (changed);
-
-        name = name.replaceAll("^[^\\p{L}\\p{N}\\+\\-_'() ]+|[^\\p{L}\\p{N}\\+\\-_'() ]+$", "");
-        name = name.replace('\u00A0', ' ')
-                .replace('\u2007', ' ')
-                .replace('\u202F', ' ');
+        // 🔹 Nettoyage doux des bords seulement
+        name = name.replaceAll(
+                "^[^\\p{L}\\p{N}\\+\\-_'() ]+|[^\\p{L}\\p{N}\\+\\-_'() ]+$",
+                ""
+        );
+        // 🔒 PARANO MODE : normalisation des espaces Unicode chelous
+        name = name.replace('\u00A0', ' ')   // espace insécable
+                .replace('\u2007', ' ')   // espace figure
+                .replace('\u202F', ' ');  // espace fine insécable
+        // 🔹 Espaces propres (compression à 1)
         name = name.replaceAll("\\s+", " ").trim();
         if (name.isEmpty()) name = "UNKNOWN";
         return name;
     }
 
-    // ===========================
-    // Utilitaires
-    // ===========================
+
+
+
+    /*
+     */
+/**
+ * Renvoie le nom du fichier sans extension.
+ *//*
+
+    private String getFileNameWithoutExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
+    }
+
+    */
+    /**
+     * Renvoie l'extension avec le point, ex: ".png"
+     *//*
+
+    private String getFileExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
+    }
+*/
+
+
+
+
+
+
     private boolean repairImage(File imageFile) {
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(
-                    "magick", "convert", imageFile.getAbsolutePath(), imageFile.getAbsolutePath()
-            );
+                    "magick", "convert", imageFile.getAbsolutePath(), imageFile.getAbsolutePath());
             Process process = processBuilder.start();
             int exitCode = process.waitFor();
+
+            // Exit code 0 indicates success
             return exitCode == 0;
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
             return false;
         }
     }
+
+    /*private boolean changeFilesExtension(List<File> files, String newExtension) {
+        try {
+            for (File file : files) {
+                Path source = file.toPath();
+                String newFileName = getFileNameWithoutExtension(file) + "." + newExtension;
+                Files.move(source, source.resolveSibling(newFileName));
+            }
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }*/
+
+    // --- surcharge pour String ---
+    /*private String getFileNameWithoutExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
+    }*/
+
+    // --- garde les versions pour File ---
+    /*private String getFileNameWithoutExtension(File file) {
+        return fileExtensionService.getFileNameWithoutExtension(file.getName());
+    }*/
 
     private void showMessage(String message, String title) {
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, message, title, JOptionPane.INFORMATION_MESSAGE));
@@ -540,296 +687,512 @@ public class FileManagerController {
         return result[0];
     }
 
-    // ===========================
-    // Distribution des fichiers dans des sous-dossiers
-    // ===========================
-    @FXML
-    private void handleStartDistribution() {
-        if (selectedDirectory == null) {
-            showMessage("No directory selected", "Error");
-            return;
-        }
-
-        int filesPerFolder;
+    private boolean renameFilesInDirectory(File directory) {
         try {
-            filesPerFolder = Integer.parseInt(filesPerFolderField.getText().trim());
-            if (filesPerFolder <= 0) throw new NumberFormatException();
-        } catch (NumberFormatException e) {
-            showMessage("Invalid number of files per folder", "Error");
-            return;
+            renameFilesRecursively(directory);
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
         }
-
-        new Thread(() -> {
-            try {
-                File[] files = selectedDirectory.listFiles(File::isFile);
-                if (files == null || files.length == 0) {
-                    Platform.runLater(() -> showMessage("No files to distribute", "Information"));
-                    return;
-                }
-
-                int folderIndex = 1;
-                int fileCount = 0;
-                File currentFolder = new File(selectedDirectory, "subfolder_" + folderIndex);
-                currentFolder.mkdirs();
-
-                for (File file : files) {
-                    if (fileCount >= filesPerFolder) {
-                        folderIndex++;
-                        currentFolder = new File(selectedDirectory, "subfolder_" + folderIndex);
-                        currentFolder.mkdirs();
-                        fileCount = 0;
-                    }
-                    Path target = currentFolder.toPath().resolve(file.getName());
-                    Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
-                    fileCount++;
-                }
-
-                Platform.runLater(() -> showMessage("Files distributed into subfolders successfully!", "Information"));
-            } catch (IOException e) {
-                e.printStackTrace();
-                Platform.runLater(() -> showMessage("Error during file distribution", "Error"));
-            }
-        }).start();
     }
 
-    // ===========================
-    // Fusionner les sous-dossiers dans un dossier principal
-    // ===========================
+//    private void renameFilesRecursively(File directory) throws IOException {
+//        File[] files = directory.listFiles();
+//        if (files == null) return;
+//
+//        for (int i = 0; i < files.length; i++) {
+//            File file = files[i];
+//            if (file.isDirectory()) {
+//                renameFilesRecursively(file);
+//            } else {
+//                String newFileName = directory.getName() + "_" + (i + 1) + getFileExtension(file);
+//                Path source = file.toPath();
+//                Path target;
+//                if (gatherInContainerCheckbox.isSelected() && containerDirectory != null) {
+//                    target = containerDirectory.toPath().resolve(newFileName);
+//                } else {
+//                    target = source.resolveSibling(newFileName);
+//                }
+//
+//                // Vérifie si le fichier cible existe déjà
+//                if (Files.exists(target)) {
+//                    System.out.println("File already exists: " + target);
+//                    continue; // Passe au fichier suivant
+//                }
+//
+//                // Déplacer le fichier
+//                try {
+//                    Files.move(source, target);
+//                } catch (IOException e) {
+//                    System.err.println("Failed to move file: " + source);
+//                    e.printStackTrace();
+//                }
+//            }
+//        }
+//    }
+
+    /*private String getFileExtension(File file) {
+        String fileName = file.getName();
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
+    }*/
+    // --- surcharge pour String ---
+    /*private String getFileExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
+    }*/
+
+
+// ---------------------------
+// Déplacement des fichiers depuis une liste .txt
+// ---------------------------
+//        public void moveFilesFromList(Path destinationRoot) throws IOException {
+//
+//            Path recycleRoot = Paths.get("C:\\$Recycle.Bin");
+//
+//            Files.walkFileTree(recycleRoot, new SimpleFileVisitor<Path>() {
+//                @Override
+//                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+//                    if (file.getFileName().toString().startsWith("$I")) {
+//                        try {
+//                            // ton code pour lire et restaurer le fichier
+//                            String originalPath = readOriginalPathFromIFile(file);
+//                            System.out.println("Found: " + originalPath);
+//                        } catch (IOException e) {
+//                            e.printStackTrace();
+//                        }
+//                    }
+//                    return FileVisitResult.CONTINUE;
+//                }
+//
+//                @Override
+//                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+//                    // Ignore les fichiers/dossiers inaccessibles
+//                    System.err.println("Skipped inaccessible file/folder: " + file);
+//                    return FileVisitResult.CONTINUE;
+//                }
+//            });
+//        }
+
+
+
+    // ---------------------------
+    // Renommage des fichiers dans un dossier
+    // ---------------------------
+    private void renameFilesRecursively(File directory) throws IOException {
+        File[] files = directory.listFiles();
+        if (files == null) return;
+
+        for (int i = 0; i < files.length; i++) {
+            File file = files[i];
+            if (file.isDirectory()) {
+                renameFilesRecursively(file);
+            } else {
+                String newFileName = directory.getName() + fileExtensionService.getFileExtension(file);
+
+                Path source = file.toPath();
+                Path target;
+
+                if (gatherInContainerCheckbox.isSelected() && containerDirectory != null) {
+                    target = containerDirectory.toPath().resolve(newFileName);
+                } else {
+                    target = source.resolveSibling(newFileName);
+                }
+
+                // Gestion des collisions de fichiers
+                int counter = 1;
+                String nameWithoutExt = fileExtensionService.getFileNameWithoutExtension(newFileName);
+                String ext = fileExtensionService.getFileExtension(newFileName);
+
+                while (Files.exists(target)) {
+                    String indexedName = nameWithoutExt + "_" + counter + ext;
+                    target = target.getParent().resolve(indexedName);
+                    counter++;
+                }
+
+                // Déplacer le fichier
+                try {
+                    Files.move(source, target);
+                } catch (IOException e) {
+                    System.err.println("Failed to move file: " + source);
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+
     @FXML
-    private void handleMergeSubfolders() {
-        if (selectedDirectory == null) {
-            showMessage("No directory selected", "Error");
-            return;
-        }
+    private Button cleanFoldersButton;
 
-        new Thread(() -> {
-            try {
-                File[] subfolders = selectedDirectory.listFiles(File::isDirectory);
-                if (subfolders == null || subfolders.length == 0) {
-                    Platform.runLater(() -> showMessage("No subfolders to merge", "Information"));
-                    return;
-                }
-
-                for (File subfolder : subfolders) {
-                    File[] files = subfolder.listFiles(File::isFile);
-                    if (files == null) continue;
-
-                    for (File file : files) {
-                        Path target = selectedDirectory.toPath().resolve(file.getName());
-                        int counter = 1;
-                        String baseName = fileExtensionService.getFileNameWithoutExtension(file.getName());
-                        String ext = fileExtensionService.getFileExtension(file.getName());
-
-                        while (Files.exists(target)) {
-                            target = selectedDirectory.toPath().resolve(baseName + "_" + counter + ext);
-                            counter++;
-                        }
-                        Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
-                    }
-
-                    // Supprimer le sous-dossier vide
-                    subfolder.delete();
-                }
-
-                Platform.runLater(() -> showMessage("Subfolders merged successfully!", "Information"));
-            } catch (IOException e) {
-                e.printStackTrace();
-                Platform.runLater(() -> showMessage("Error during subfolder merging", "Error"));
-            }
-        }).start();
-    }
-
-    // ===========================
-    // Nettoyage des noms de dossiers
-    // ===========================
     @FXML
     private void handleCleanFoldersName() {
-        if (selectedDirectory == null) {
-            showMessage("No directory selected", "Error");
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Select Parent Folder");
+        File parentDir = chooser.showDialog(null);
+        if (parentDir == null) {
+            strateStatusLabel.setText("Status: No folder selected.");
             return;
         }
 
-        File[] folders = selectedDirectory.listFiles(File::isDirectory);
-        if (folders == null || folders.length == 0) {
-            showMessage("No folders found to clean", "Information");
+        File[] subDirs = parentDir.listFiles(File::isDirectory);
+        if (subDirs == null || subDirs.length == 0) {
+            strateStatusLabel.setText("Status: No subfolders found.");
             return;
         }
 
-        for (File folder : folders) {
-            String cleanFolderName = cleanName(folder.getName());
-            if (!folder.getName().equals(cleanFolderName)) {
-                File newFolder = new File(folder.getParent(), cleanFolderName);
-                if (!newFolder.exists()) folder.renameTo(newFolder);
-            }
-        }
+        int renamedCount = 0;
 
-        showMessage("Folder names cleaned successfully!", "Information");
-    }
+        for (File subDir : subDirs) {
+            String originalName = subDir.getName();
 
-    // ===========================
-    // Animation de présentation JavaFX
-    // ===========================
-    private void playPresentationAnimation(Node node) {
-        FadeTransition fade = new FadeTransition(Duration.seconds(1), node);
-        fade.setFromValue(0);
-        fade.setToValue(1);
-        fade.setCycleCount(1);
-        fade.play();
-
-        TranslateTransition translate = new TranslateTransition(Duration.seconds(1), node);
-        translate.setFromY(-50);
-        translate.setToY(0);
-        translate.setCycleCount(1);
-        translate.play();
-    }
+            // Nettoyage du nom du dossier
+//            String cleanFolderName = originalName
+//                    .replaceAll("\\d+", "")                           // supprime les chiffres
+//                    .replaceAll("^[\\-_'+]+|[\\-_'+]+$", "")          // supprime _, -, ', + au début ou fin
+//                    .replaceAll("[()\\[\\]{}]", "")                  // supprime (), [], {}
+//                    .replaceAll("[^a-zA-Z0-9\\s\\-_'+]", "")         // garde lettres, chiffres, espaces, _, -, ', +
+//                    .replaceAll("\\s+", " ")                          // condense les espaces multiples
+//                    .trim();
+            String cleanFolderName = originalName
+                    // supprime chiffres SEULEMENT s’ils sont seuls ou parasites
+                    .replaceAll("\\d+", "")
+                    // supprime caractères NON lettres/chiffres aux BORDS seulement
+                    .replaceAll("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$", "")
+                    // espaces propres
+                    .replaceAll("\\s+", " ")
+                    .trim();
 
 
-    @FXML
-    private TextField filesPerFolderField; // Pour handleStartDistribution
-    @FXML
-    private File recycleBinDirectory;      // Pour handleExportRecycleBin
-    // ===========================
-    // Export/Restoration de la corbeille
-    // ===========================
-    @FXML
-    private void handleExportRecycleBin() {
-        if (recycleBinDirectory == null || !recycleBinDirectory.exists()) {
-            showMessage("Recycle Bin not defined or doesn't exist", "Error");
-            return;
-        }
 
-        File exportDir = new File(selectedDirectory, "recycle_export");
-        if (!exportDir.exists()) exportDir.mkdirs();
+            if (cleanFolderName.isEmpty()) cleanFolderName = "UNKNOWN";
 
-        File[] files = recycleBinDirectory.listFiles(File::isFile);
-        if (files == null || files.length == 0) {
-            showMessage("Recycle Bin is empty", "Information");
-            return;
-        }
-
-        for (File file : files) {
-            Path target = exportDir.toPath().resolve(file.getName());
-            int counter = 1;
-            String baseName = fileExtensionService.getFileNameWithoutExtension(file.getName());
-            String ext = fileExtensionService.getFileExtension(file.getName());
-
-            while (Files.exists(target)) {
-                target = exportDir.toPath().resolve(baseName + "_" + counter + ext);
-                counter++;
-            }
+            Path targetDir = parentDir.toPath().resolve(cleanFolderName);
 
             try {
-                Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+                if (Files.exists(targetDir)) {
+                    // Fusionner le contenu du dossier actuel dans le dossier existant
+                    try (Stream<Path> files = Files.list(subDir.toPath())) {
+                        files.forEach(file -> {
+                            try {
+
+                                if (!Files.isWritable(file)) {
+                                    System.err.println("Locked or inaccessible file skipped: " + file);
+                                    return; // ✅ return "void" = OK
+                                }
+
+                                Path targetFile = targetDir.resolve(file.getFileName());
+                                String nameWithoutExt = fileExtensionService.getFileNameWithoutExtension(file.getFileName().toString());
+                                String ext = fileExtensionService.getFileExtension(file.getFileName().toString());
+                                int counter = 1;
+
+                                while (Files.exists(targetFile)) {
+                                    targetFile = targetDir.resolve(nameWithoutExt + "_" + counter + ext);
+                                    counter++;
+                                }
+
+                                Files.move(file, targetFile);
+
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        });
+
+                    }
+
+                    // Supprimer le dossier seulement s'il est vide
+                    File[] remaining = subDir.listFiles();
+                    if (remaining == null || remaining.length == 0) {
+                        Files.delete(subDir.toPath());
+                    }
+
+                    renamedCount++;
+                } else if (!originalName.equals(cleanFolderName)) {
+                    // Renommer le dossier si nécessaire
+                    Files.move(subDir.toPath(), targetDir);
+                    renamedCount++;
+                }
+                // sinon le dossier est déjà propre, on ne fait rien
             } catch (IOException e) {
+                System.err.println("Failed to process folder: " + subDir.getAbsolutePath());
                 e.printStackTrace();
             }
         }
 
-        showMessage("Recycle Bin exported successfully!", "Information");
+        strateStatusLabel.setText("Status: " + renamedCount + " folder(s) cleaned/merged.");
     }
 
+
     @FXML
-    private void handleChooseDestination() {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Destination Directory");
-        File selected = directoryChooser.showDialog(null);
-        if (selected != null) {
-            selectedDirectory = selected;
-            showMessage("Selected directory: " + selectedDirectory.getAbsolutePath(), "Information");
-        }
+    private Button exportRecycleBinButton;
+
+    @FXML
+    private void handleExportRecycleBin() {
+
+        exportRecycleBinButton.setDisable(true);
+
+        new Thread(() -> {
+            try {
+
+                // 🔥 Script PowerShell pour restaurer la corbeille et lister les fichiers restaurés
+                String script =
+                        "$desktopPath = [Environment]::GetFolderPath('Desktop')\n" +
+                                "$logFile = Join-Path $desktopPath 'desktop_2.txt'\n" +
+                                "$shell = New-Object -ComObject Shell.Application\n" +
+                                "$recycleBin = $shell.Namespace(0xA)\n" +
+                                "$results = @()\n" +
+                                "foreach ($item in @($recycleBin.Items())) {\n" +
+                                "    $originalPath = $recycleBin.GetDetailsOf($item, 1)\n" +
+                                "    if ($originalPath) {\n" +
+                                "        $fullPath = Join-Path $originalPath $item.Name\n" +
+                                "        $results += $fullPath\n" +
+                                "        # RESTAURATION RÉELLE\n" +
+                                "        $item.InvokeVerb(\"undelete\")\n" +
+                                "    }\n" +
+                                "}\n" +
+                                "$results | Set-Content -Path $logFile -Encoding UTF8\n";
+
+                Path tempScript = Files.createTempFile("export_restore_recyclebin_", ".ps1");
+                Files.write(tempScript, script.getBytes(StandardCharsets.UTF_8));
+
+                ProcessBuilder pb = new ProcessBuilder(
+                        "powershell.exe",
+                        "-STA",
+                        "-ExecutionPolicy", "Bypass",
+                        "-NoProfile",
+                        "-File", tempScript.toAbsolutePath().toString()
+                );
+
+                Process process = pb.start();
+                int exitCode = process.waitFor();
+
+                Files.deleteIfExists(tempScript);
+
+                Platform.runLater(() -> {
+                    exportRecycleBinButton.setDisable(false);
+                    if (exitCode == 0) {
+                        strateStatusLabel.setText("Status: Recycle Bin restored successfully!");
+                        showMessage(
+                                "Recycle Bin export completed.\n\n" +
+                                        "✔ Files restored to original locations\n" +
+                                        "✔ desktop_2.txt generated on Desktop",
+                                "Success"
+                        );
+                    } else {
+                        strateStatusLabel.setText("Status: PowerShell exited with code " + exitCode);
+                        showMessage(
+                                "PowerShell exited with code: " + exitCode,
+                                "Error"
+                        );
+                    }
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    exportRecycleBinButton.setDisable(false);
+                    strateStatusLabel.setText("Status: Error restoring Recycle Bin.");
+                    showMessage(
+                            "An error occurred while exporting/restoring the Recycle Bin.",
+                            "Error"
+                    );
+                });
+            }
+        }).start();
     }
 
     @FXML
     private void handleSelectDistributionFolder() {
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Select Folder to Distribute");
+
         File folder = chooser.showDialog(null);
         if (folder != null && folder.isDirectory()) {
-            distributionRootFolder = folder; // variable déjà déclarée dans ton controller
-            distributionFolderField.setText(folder.getAbsolutePath()); // met à jour le TextField
+            distributionRootFolder = folder;
+            distributionFolderField.setText(folder.getAbsolutePath());
         }
     }
 
+    @FXML
+    private void handleStartDistribution() {
+        if (distributionRootFolder == null) {
+            distributionStatusLabel.setText("Status: No folder selected");
+            return;
+        }
 
-    /**
-     * Supprime les fichiers originaux après changement d'extension ou conversion.
-     * Utilisée après handleProceed().
-     */
-    private void deleteConvertedFiles(List<File> files) {
-        if (files == null || files.isEmpty()) return;
+        int n;
+        try {
+            n = Integer.parseInt(subdivisionCountField.getText());
+            if (n <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            distributionStatusLabel.setText("Status: Invalid subdivision number");
+            return;
+        }
 
-        for (File file : files) {
-            try {
-                if (file.exists()) {
-                    boolean deleted = file.delete();
-                    if (!deleted) {
-                        System.err.println("Failed to delete file: " + file.getAbsolutePath());
-                    } else {
-                        System.out.println("Deleted file: " + file.getAbsolutePath());
+        File[] files = distributionRootFolder.listFiles(File::isFile);
+        if (files == null || files.length == 0) {
+            distributionStatusLabel.setText("Status: No files to distribute");
+            return;
+        }
+
+        int totalFiles = files.length;
+        distributionProgressBar.setProgress(0);
+        distributionStatusLabel.setText("Status: Processing...");
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                List<Path> movedFiles = new ArrayList<>();
+                List<Path> createdDirs = new ArrayList<>();
+
+                try {
+                    int index = 0;
+                    while (index < totalFiles) {
+                        for (int i = 1; i <= n && index < totalFiles; i++, index++) {
+                            Path subDir = distributionRootFolder.toPath().resolve(String.valueOf(i));
+                            if (!Files.exists(subDir)) {
+                                Files.createDirectories(subDir);
+                                createdDirs.add(subDir);
+                            }
+
+                            Path source = files[index].toPath();
+                            Path target = subDir.resolve(source.getFileName());
+                            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                            movedFiles.add(target);
+
+                            updateProgress(index + 1, totalFiles);
+                        }
+                    }
+                } catch (Exception ex) {
+                    // 🔄 ROLLBACK
+                    for (Path p : movedFiles) {
+                        try {
+                            Files.move(p, distributionRootFolder.toPath().resolve(p.getFileName()),
+                                    StandardCopyOption.REPLACE_EXISTING);
+                        } catch (IOException ignored) {}
+                    }
+                    for (Path dir : createdDirs) {
+                        try {
+                            if (Files.isDirectory(dir) && Objects.requireNonNull(dir.toFile().list()).length == 0) {
+                                Files.deleteIfExists(dir);
+                            }
+                        } catch (IOException ignored) {}
+                    }
+                    throw ex;
+                }
+                return null;
+            }
+        };
+
+        distributionProgressBar.progressProperty().unbind();
+        distributionProgressBar.progressProperty().bind(task.progressProperty());
+
+        task.setOnSucceeded(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(1);
+            distributionStatusLabel.setText("Status: Done – " + totalFiles + " files distributed");
+        });
+
+        task.setOnFailed(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(0);
+            distributionStatusLabel.setText("Status: Error – rollback completed");
+        });
+
+        new Thread(task).start();
+    }
+
+    @FXML
+    private void handleMergeSubfolders() {
+        if (distributionRootFolder == null) {
+            distributionStatusLabel.setText("Status: No folder selected");
+            return;
+        }
+
+        File[] subDirs = distributionRootFolder.listFiles(File::isDirectory);
+        if (subDirs == null || subDirs.length == 0) {
+            distributionStatusLabel.setText("Status: No subfolders to merge");
+            return;
+        }
+
+        distributionProgressBar.setProgress(0);
+        distributionStatusLabel.setText("Status: Merging...");
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                List<Path> movedFiles = new ArrayList<>();
+                int totalFiles = 0;
+
+                for (File dir : subDirs) {
+                    totalFiles += Objects.requireNonNull(dir.listFiles(File::isFile)).length;
+                }
+                int processed = 0;
+
+                for (File dir : subDirs) {
+                    File[] filesInDir = dir.listFiles(File::isFile);
+                    if (filesInDir == null) continue;
+
+                    for (File file : filesInDir) {
+                        Path target = distributionRootFolder.toPath().resolve(file.getName());
+                        Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+                        movedFiles.add(target);
+                        processed++;
+                        updateProgress(processed, totalFiles);
+                    }
+
+                    // Supprimer le sous-dossier s'il est vide et ne contient pas de sous-dossiers
+                    File[] remaining = dir.listFiles();
+                    if (remaining == null || remaining.length == 0) {
+                        Files.deleteIfExists(dir.toPath());
                     }
                 }
-            } catch (Exception e) {
-                System.err.println("Error deleting file: " + file.getAbsolutePath());
-                e.printStackTrace();
+                return null;
             }
-        }
+        };
+
+        distributionProgressBar.progressProperty().unbind();
+        distributionProgressBar.progressProperty().bind(task.progressProperty());
+
+        task.setOnSucceeded(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(1);
+            distributionStatusLabel.setText("Status: Merge completed");
+        });
+
+        task.setOnFailed(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(0);
+            distributionStatusLabel.setText("Status: Error during merge");
+        });
+
+        new Thread(task).start();
     }
 
     @FXML
-    private TextArea selectedFilesInfo;
+    private VBox presentationCard;
 
     @FXML
-    private void handleSelectFiles() {
-        // Réinitialisation avant nouvelle sélection
-        selectedFiles = new ArrayList<>();
-        selectedDirectory = null; // on réinitialise le dossier
-        selectedFilesInfo.clear();
+    private Tab presentationTab;
 
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Select Files");
-        List<File> files = fileChooser.showOpenMultipleDialog(new Stage());
+    private void playPresentationAnimation() {
 
-        if (files != null && !files.isEmpty()) {
-            selectedFiles.addAll(files);
-            // On prend le parent du premier fichier comme dossier sélectionné
-            selectedDirectory = files.get(0).getParentFile();
-        }
+        FadeTransition fade = new FadeTransition(Duration.millis(1200), presentationCard);
+        fade.setFromValue(0);
+        fade.setToValue(1);
+        fade.setInterpolator(Interpolator.EASE_OUT);
 
-        updateSelectedFilesInfo();
+        TranslateTransition slide = new TranslateTransition(Duration.millis(1200), presentationCard);
+        slide.setFromY(20);
+        slide.setToY(0);
+        slide.setInterpolator(Interpolator.EASE_OUT);
+
+        ParallelTransition animation = new ParallelTransition(fade, slide);
+        animation.play();
     }
 
-    @FXML
-    private void handleSelectDirectory() {
-        // Réinitialisation avant nouvelle sélection
-        selectedFiles = new ArrayList<>();
-        selectedFilesInfo.clear();
-
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Directory");
-        selectedDirectory = directoryChooser.showDialog(new Stage());
-
-        // Si un dossier est sélectionné, on peut remplir la liste avec tous les fichiers du dossier
-        if (selectedDirectory != null && selectedDirectory.isDirectory()) {
-            File[] filesArray = selectedDirectory.listFiles(File::isFile);
-            if (filesArray != null) {
-                selectedFiles.addAll(Arrays.asList(filesArray));
-            }
-        }
-
-        updateSelectedFilesInfo();
-    }
-
-    /** Met à jour le TextArea avec le répertoire et le nombre de fichiers sélectionnés */
-    private void updateSelectedFilesInfo() {
-        StringBuilder info = new StringBuilder();
-        if (selectedDirectory != null) {
-            info.append("Selected folder: ").append(selectedDirectory.getAbsolutePath()).append("\n");
-        } else {
-            info.append("Selected folder: [none]\n");
-        }
-        info.append("Number of files selected: ").append(selectedFiles != null ? selectedFiles.size() : 0);
-        selectedFilesInfo.setText(info.toString());
-    }
 
 
 
