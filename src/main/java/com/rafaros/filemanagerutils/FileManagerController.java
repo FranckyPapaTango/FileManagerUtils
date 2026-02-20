@@ -92,15 +92,7 @@ public class FileManagerController {
 
     private final FileExtensionService fileExtensionService = new FileExtensionService();
 
-    // ===========================
-    // Sélection de fichiers
-    // ===========================
-    @FXML
-    private void handleSelectFiles() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Select Files");
-        selectedFiles = fileChooser.showOpenMultipleDialog(new Stage());
-    }
+
 
     @FXML
     private void handleSelectImages() {
@@ -168,18 +160,6 @@ public class FileManagerController {
         });
     }
 
-    // ===========================
-    // Sélection de répertoires
-    // ===========================
-    @FXML
-    private void handleSelectDirectory() {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Directory");
-        selectedDirectory = directoryChooser.showDialog(new Stage());
-        if (selectedDirectory != null) {
-            selectedDirectoryField.setText(selectedDirectory.getName());
-        }
-    }
 
     @FXML
     private void handleChooseLocation() {
@@ -794,6 +774,63 @@ public class FileManagerController {
             }
         }
     }
+
+    @FXML
+    private TextArea selectedFilesInfo;
+
+    @FXML
+    private void handleSelectFiles() {
+        // Réinitialisation avant nouvelle sélection
+        selectedFiles = new ArrayList<>();
+        selectedDirectory = null; // on réinitialise le dossier
+        selectedFilesInfo.clear();
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Files");
+        List<File> files = fileChooser.showOpenMultipleDialog(new Stage());
+
+        if (files != null && !files.isEmpty()) {
+            selectedFiles.addAll(files);
+            // On prend le parent du premier fichier comme dossier sélectionné
+            selectedDirectory = files.get(0).getParentFile();
+        }
+
+        updateSelectedFilesInfo();
+    }
+
+    @FXML
+    private void handleSelectDirectory() {
+        // Réinitialisation avant nouvelle sélection
+        selectedFiles = new ArrayList<>();
+        selectedFilesInfo.clear();
+
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Directory");
+        selectedDirectory = directoryChooser.showDialog(new Stage());
+
+        // Si un dossier est sélectionné, on peut remplir la liste avec tous les fichiers du dossier
+        if (selectedDirectory != null && selectedDirectory.isDirectory()) {
+            File[] filesArray = selectedDirectory.listFiles(File::isFile);
+            if (filesArray != null) {
+                selectedFiles.addAll(Arrays.asList(filesArray));
+            }
+        }
+
+        updateSelectedFilesInfo();
+    }
+
+    /** Met à jour le TextArea avec le répertoire et le nombre de fichiers sélectionnés */
+    private void updateSelectedFilesInfo() {
+        StringBuilder info = new StringBuilder();
+        if (selectedDirectory != null) {
+            info.append("Selected folder: ").append(selectedDirectory.getAbsolutePath()).append("\n");
+        } else {
+            info.append("Selected folder: [none]\n");
+        }
+        info.append("Number of files selected: ").append(selectedFiles != null ? selectedFiles.size() : 0);
+        selectedFilesInfo.setText(info.toString());
+    }
+
 
 
 }

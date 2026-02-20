@@ -15,6 +15,7 @@
 
 
 <?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.TextArea?>
 <TabPane xmlns:fx="http://javafx.com/fxml/1"
          fx:controller="com.rafaros.filemanagerutils.FileManagerController">
 
@@ -109,26 +110,38 @@
                       AnchorPane.leftAnchor="0"
                       AnchorPane.rightAnchor="0">
 
-                    <Button text="Select Files"
-                            onAction="#handleSelectFiles"/>
+                    <!-- HBox pour les boutons côte à côte -->
+                    <HBox spacing="10" alignment="CENTER">
+                        <Button text="Select Files" onAction="#handleSelectFiles"/>
+                        <Button text="Select Folder" onAction="#handleSelectDirectory"/>
+                    </HBox>
 
-                    <!--<Button text="Select Folder"
-                            onAction="#handleSelectFolder"/>-->
+                    <!-- TextArea dans un HBox pour contrôler la largeur -->
+                    <HBox alignment="CENTER">
+                        <TextArea fx:id="selectedFilesInfo"
+                                  editable="false"
+                                  prefRowCount="4"
+                                  wrapText="true"
+                                  promptText="Selected folder and number of files will appear here"
+                                  prefWidth="510"/> <!-- largeur fixe à moitié environ -->
+                    </HBox>
 
-
-                    <Button text="Proceed"
-                            onAction="#handleProceed"/>
-
+                    <!-- HBox pour l'extension -->
                     <HBox spacing="10" alignment="CENTER">
                         <Label text="File Extension:"/>
                         <TextField fx:id="extensionField" prefWidth="150"/>
                     </HBox>
 
+                    <!-- Proceed button -->
+                    <Button text="Proceed" onAction="#handleProceed"/>
+
                 </VBox>
             </AnchorPane>
-
         </StackPane>
     </Tab>
+
+
+
 
 
     <Tab text="Pics FileList Generator" styleClass="tab-header-2" closable="false">
