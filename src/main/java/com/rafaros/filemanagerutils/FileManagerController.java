@@ -4,10 +4,7 @@ import com.rafaros.filemanagerutils.service.FileExtensionService;
 import com.rafaros.filemanagerutils.service.StrateMovingService;
 import com.sun.javafx.charts.Legend;
 import com.sun.javafx.menu.MenuItemBase;
-import javafx.animation.FadeTransition;
-import javafx.animation.Interpolator;
-import javafx.animation.ParallelTransition;
-import javafx.animation.TranslateTransition;
+import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -502,6 +499,29 @@ public class FileManagerController {
                 playPresentationAnimation();
             }
         });
+
+        // Ajuste le texte du toggle au départ
+        recycleBinToggle.setText("RecycleBin Off");
+
+            // Désactive le bouton au départ
+            exportRecycleBinButton.setDisable(true);
+
+            // Assure que le toggle commence sur OFF
+            recycleBinToggle.setSelected(false);
+            recycleBinToggle.setText("RecycleBin Off");
+
+            // Binding du texte et activation/désactivation du bouton
+            recycleBinToggle.selectedProperty().addListener((obs, wasSelected, isNowSelected) -> {
+                exportRecycleBinButton.setDisable(!isNowSelected);
+                recycleBinToggle.setText(isNowSelected ? "RecycleBin On" : "RecycleBin Off");
+                // style inline si pas CSS
+                recycleBinToggle.setStyle(isNowSelected ?
+                        "-fx-background-color: green; -fx-text-fill: white;" :
+                        "-fx-background-color: red; -fx-text-fill: white;");
+            });
+
+            // Applique le style initial
+            recycleBinToggle.setStyle("-fx-background-color: red; -fx-text-fill: white;");
     }
 
 
@@ -756,7 +776,7 @@ public class FileManagerController {
 
     @FXML
     private void handleMoveFiles() {
-        this.strateMovingService.handleMoveFiles( strateStatusLabel, moveFilesButton, destinationRoot);
+        this.strateMovingService.handleMoveFiles( strateStatusLabel, moveFilesButton, destinationRoot, exportProgressBar);
     }
 
     @FXML
@@ -776,6 +796,62 @@ public class FileManagerController {
      this.strateMovingService.handleExportRecycleBin(  exportRecycleBinButton,  strateStatusLabel);
     }
 
+    @FXML
+    private ProgressBar exportProgressBar;
+
+
+    @FXML
+    private void handleExportFolderList() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Folder to Export List");
+
+        File selectedDir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
+        if (selectedDir == null || !selectedDir.isDirectory()) {
+            showMessage(Alert.AlertType.WARNING, "No folder selected", "Please select a valid folder.");
+            return;
+        }
+
+        // 🔹 Chemin EXACT comme dans StrateMovingService
+        Path outputPath = Paths.get(System.getProperty("user.home"), "OneDrive", "Desktop", "desktop_2.txt");
+
+        try {
+            // Assure que le dossier Desktop existe
+            Files.createDirectories(outputPath.getParent());
+
+            try (BufferedWriter writer = Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)) {
+                Files.walk(selectedDir.toPath())
+                        .filter(Files::isRegularFile)
+                        .forEach(path -> {
+                            try {
+                                writer.write(path.toAbsolutePath().toString());
+                                writer.newLine();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        });
+            }
+
+            showMessage(Alert.AlertType.INFORMATION,
+                    "Export Completed",
+                    "File list exported to: " + outputPath.toAbsolutePath());
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            showMessage(Alert.AlertType.ERROR,
+                    "Error",
+                    "Failed to export file list: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private ToggleButton recycleBinToggle;
+
+    @FXML
+    private void handleRecycleBinToggle() {
+        boolean active = recycleBinToggle.isSelected();
+        exportRecycleBinButton.setDisable(!active); // active/désactive le bouton
+        recycleBinToggle.setText(active ? "RecycleBin On" : "RecycleBin Off");
+    }
     /*============================================================================
     ==============================================================================
     ==============================================================================*/

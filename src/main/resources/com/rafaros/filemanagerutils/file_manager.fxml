@@ -16,6 +16,7 @@
 
 <?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.ToggleButton?>
 <TabPane xmlns:fx="http://javafx.com/fxml/1"
          fx:controller="com.rafaros.filemanagerutils.FileManagerController">
 
@@ -26,7 +27,7 @@
 
 
 
-    <StackPane styleClass="tab-bg-0">
+        <StackPane styleClass="tab-bg-0">
             <Pane styleClass="overlay"/>
 
             <AnchorPane>
@@ -149,7 +150,7 @@
 
     <Tab text="Pics FileList Generator" styleClass="tab-header-2" closable="false">
         <StackPane styleClass="tab-bg-2">
-        <Pane styleClass="overlay"/>
+            <Pane styleClass="overlay"/>
             <AnchorPane>
                 <VBox spacing="12"
                       alignment="CENTER"
@@ -158,98 +159,120 @@
                       AnchorPane.leftAnchor="0"
                       AnchorPane.rightAnchor="0">
 
-                <HBox spacing="10" alignment="CENTER">
-                    <Button text="Location" onAction="#handleChooseLocation"/>
-                    <Label fx:id="locationLabel" text="No folder selected"/>
-                </HBox>
-                <HBox spacing="10" alignment="CENTER">
-                    <Label text="Restriction:"/>
-                    <TextField fx:id="restrictionField"
-                               promptText="Enter folder prefix"/>
-                </HBox>
-                <Button text="Generate Files List"
-                        onAction="#handleGenerateFilesList"/>
-                <Label fx:id="statusLabel" text="Status: Waiting"/>
-            </VBox>
-        </AnchorPane>
+                    <HBox spacing="10" alignment="CENTER">
+                        <Button text="Location" onAction="#handleChooseLocation"/>
+                        <Label fx:id="locationLabel" text="No folder selected"/>
+                    </HBox>
+                    <HBox spacing="10" alignment="CENTER">
+                        <Label text="Restriction:"/>
+                        <TextField fx:id="restrictionField"
+                                   promptText="Enter folder prefix"/>
+                    </HBox>
+                    <Button text="Generate Files List"
+                            onAction="#handleGenerateFilesList"/>
+                    <Label fx:id="statusLabel" text="Status: Waiting"/>
+                </VBox>
+            </AnchorPane>
         </StackPane>
     </Tab>
 
-    <!-- 🔹 NOUVEL ONGLET -->
-    <Tab text="File List Strate Moving" styleClass="tab-header-3" closable="false">
+    <Tab text="File List Strate Moving"
+         styleClass="tab-header-3"
+         closable="false">
+
         <StackPane styleClass="tab-bg-3">
-        <Pane styleClass="overlay"/>
-        <AnchorPane>
-            <VBox spacing="12"
-                  alignment="CENTER"
-                  AnchorPane.topAnchor="0"
-                  AnchorPane.bottomAnchor="0"
-                  AnchorPane.leftAnchor="0"
-                  AnchorPane.rightAnchor="0">
+
+            <!-- CONTENU PRINCIPAL -->
+            <AnchorPane>
+                <VBox spacing="12"
+                      alignment="CENTER"
+                      AnchorPane.topAnchor="0"
+                      AnchorPane.bottomAnchor="0"
+                      AnchorPane.leftAnchor="0"
+                      AnchorPane.rightAnchor="0">
+
+                    <HBox spacing="10" alignment="CENTER">
+                        <Button text="Select Input Folder To Export to List"
+                                onAction="#handleExportFolderList"/>
+
+                        <!-- Toggle pour activer/désactiver RecycleBin -->
+                        <ToggleButton fx:id="recycleBinToggle"
+                                      text="RecycleBin On"
+                                      selected="false"
+                                      onAction="#handleRecycleBinToggle"
+                                      styleClass="toggle-switch"/>
+
+                        <Button fx:id="exportRecycleBinButton"
+                                text="Select RecycleBin +Restore +Export to List"
+                                onAction="#handleExportRecycleBin"/>
+                    </HBox>
 
 
-                <!-- 🔹 NOUVEAU BOUTON EXPORT RECYCLE BIN -->
-                <Button fx:id="exportRecycleBinButton"
-                        text="Export + Restore Recycle Bin"
-                        onAction="#handleExportRecycleBin"/>
+                    <Button text="Select Destination Folder"
+                            onAction="#handleChooseDestination"/>
 
 
-                <Button text="Select Destination Folder"
-                        onAction="#handleChooseDestination"/>
+                    <TextField fx:id="destinationField"
+                               editable="false"
+                               promptText="No destination selected"/>
 
-                <TextField fx:id="destinationField"
-                           editable="false"
-                           promptText="No destination selected"/>
+                    <Button fx:id="moveFilesButton"
+                            text="Move Files"
+                            onAction="#handleMoveFiles"
+                            disable="true"/>
 
-                <Button fx:id="moveFilesButton"
-                        text="Move Files"
-                        onAction="#handleMoveFiles"
-                        disable="true"/>
+                    <Label fx:id="strateStatusLabel"
+                           text="Status: Waiting"/>
 
+                    <!-- ✅ PROGRESS BAR CENTRALISEE -->
+                    <ProgressBar fx:id="exportProgressBar"
+                                 prefWidth="510"
+                                 progress="0.0"
+                                 visible="false"
+                                 managed="true"/>
 
+                    <Button fx:id="cleanFoldersButton"
+                            text="Clean Folders Name"
+                            onAction="#handleCleanFoldersName"/>
 
+                </VBox>
+            </AnchorPane>
 
-                <Label fx:id="strateStatusLabel"
-                       text="Status: Waiting"/>
+            <!-- ✅ OVERLAY CENTRALISE -->
+            <Pane fx:id="overlayPane"
+                  styleClass="overlay"
+                  visible="false"/>
 
-                <!-- 🔹 NOUVEAU BOUTON CLEAN FOLDERS -->
-                <Button fx:id="cleanFoldersButton"
-                        text="Clean Folders Name"
-                        onAction="#handleCleanFoldersName"/>
-
-
-            </VBox>
-        </AnchorPane>
         </StackPane>
     </Tab>
 
 
     <Tab text="Rename by FolderName" styleClass="tab-header-4" closable="false">
         <StackPane styleClass="tab-bg-4">
-        <Pane styleClass="overlay"/>
-        <AnchorPane>
-            <VBox spacing="12"
-                  alignment="CENTER"
-                  AnchorPane.topAnchor="0"
-                  AnchorPane.bottomAnchor="0"
-                  AnchorPane.leftAnchor="0"
-                  AnchorPane.rightAnchor="0">
+            <Pane styleClass="overlay"/>
+            <AnchorPane>
+                <VBox spacing="12"
+                      alignment="CENTER"
+                      AnchorPane.topAnchor="0"
+                      AnchorPane.bottomAnchor="0"
+                      AnchorPane.leftAnchor="0"
+                      AnchorPane.rightAnchor="0">
 
-                <Button text="Select Directory"
-                        onAction="#handleSelectDirectory"/>
-                <TextField fx:id="selectedDirectoryField"
-                           editable="false"/>
-                <Button text="Rename Content"
-                        fx:id="renameButton"
-                        onAction="#handleRenameContent"/>
-                <CheckBox fx:id="gatherInContainerCheckbox"
-                          text="Rassembler dans :"
-                          onAction="#handleGatherInContainer"/>
-                <TextField fx:id="containerNameField"
-                           promptText="Conteneur Final"
-                           visible="false"/>
-            </VBox>
-        </AnchorPane>
+                    <Button text="Select Directory"
+                            onAction="#handleSelectDirectory"/>
+                    <TextField fx:id="selectedDirectoryField"
+                               editable="false"/>
+                    <Button text="Rename Content"
+                            fx:id="renameButton"
+                            onAction="#handleRenameContent"/>
+                    <CheckBox fx:id="gatherInContainerCheckbox"
+                              text="Rassembler dans :"
+                              onAction="#handleGatherInContainer"/>
+                    <TextField fx:id="containerNameField"
+                               promptText="Conteneur Final"
+                               visible="false"/>
+                </VBox>
+            </AnchorPane>
         </StackPane>
     </Tab>
 
@@ -303,24 +326,24 @@
 
     <Tab text="Repair Corrupted Images" styleClass="tab-header-6" closable="false">
         <StackPane styleClass="tab-bg-6">
-        <Pane styleClass="overlay"/>
-        <AnchorPane>
-            <VBox spacing="12"
-                  alignment="CENTER"
-                  AnchorPane.topAnchor="0"
-                  AnchorPane.bottomAnchor="0"
-                  AnchorPane.leftAnchor="0"
-                  AnchorPane.rightAnchor="0">
+            <Pane styleClass="overlay"/>
+            <AnchorPane>
+                <VBox spacing="12"
+                      alignment="CENTER"
+                      AnchorPane.topAnchor="0"
+                      AnchorPane.bottomAnchor="0"
+                      AnchorPane.leftAnchor="0"
+                      AnchorPane.rightAnchor="0">
 
-                <Button text="Select Images"
-                        onAction="#handleSelectImages"/>
-                <TextField fx:id="selectedImagesField"
-                           editable="false"
-                           promptText="Selected Images" />
-                <Button text="Repair Images"
-                        onAction="#handleRepairImages"/>
-            </VBox>
-        </AnchorPane>
+                    <Button text="Select Images"
+                            onAction="#handleSelectImages"/>
+                    <TextField fx:id="selectedImagesField"
+                               editable="false"
+                               promptText="Selected Images" />
+                    <Button text="Repair Images"
+                            onAction="#handleRepairImages"/>
+                </VBox>
+            </AnchorPane>
         </StackPane>
     </Tab>
 

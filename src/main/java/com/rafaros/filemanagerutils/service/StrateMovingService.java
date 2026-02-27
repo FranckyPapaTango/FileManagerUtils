@@ -1,8 +1,10 @@
 package com.rafaros.filemanagerutils.service;
 
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.stage.DirectoryChooser;
 
 import javax.swing.*;
@@ -10,6 +12,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class StrateMovingService {
@@ -17,7 +20,7 @@ public class StrateMovingService {
     private final FileExtensionService fileExtensionService = new FileExtensionService();
 
 
-    public void handleMoveFiles(Label strateStatusLabel, Button moveFilesButton, Path destinationRoot ) {
+    public void handleMoveFiles(Label strateStatusLabel, Button moveFilesButton, Path destinationRoot, ProgressBar exportProgressBar) {
 
         if (destinationRoot == null) {
             strateStatusLabel.setText("Status: Please select a destination folder first!");
@@ -26,20 +29,23 @@ public class StrateMovingService {
 
         moveFilesButton.setDisable(true);
 
+        exportProgressBar.setProgress(0);
+        exportProgressBar.setVisible(true);
+        exportProgressBar.setManaged(true);
+
         new Thread(() -> {
             try {
-                // 🔥 Chemin du fichier desktop_2.txt
                 Path logPath = Paths.get(System.getProperty("user.home"), "OneDrive", "Desktop", "desktop_2.txt");
 
                 if (!Files.exists(logPath)) {
                     Platform.runLater(() -> {
                         strateStatusLabel.setText("Status: desktop_2.txt not found!");
                         moveFilesButton.setDisable(false);
+                        exportProgressBar.setVisible(false);
                     });
                     return;
                 }
 
-                // 🔥 Lecture UTF-8 avec BOM
                 List<String> restoredFiles = new ArrayList<>();
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(new FileInputStream(logPath.toFile()), StandardCharsets.UTF_8))) {
@@ -48,12 +54,7 @@ public class StrateMovingService {
                     while ((line = reader.readLine()) != null) {
                         line = line.trim();
                         if (line.isEmpty()) continue;
-
-                        // Enlever BOM si présent
-                        if (restoredFiles.isEmpty() && line.startsWith("\uFEFF")) {
-                            line = line.substring(1);
-                        }
-
+                        if (restoredFiles.isEmpty() && line.startsWith("\uFEFF")) line = line.substring(1);
                         restoredFiles.add(line);
                     }
                 }
@@ -62,13 +63,16 @@ public class StrateMovingService {
                     Platform.runLater(() -> {
                         strateStatusLabel.setText("Status: No files to move found in desktop_2.txt");
                         moveFilesButton.setDisable(false);
+                        exportProgressBar.setVisible(false);
                     });
                     return;
                 }
 
+                int totalFiles = restoredFiles.size();
                 int movedCount = 0;
 
-                for (String filePathStr : restoredFiles) {
+                for (int i = 0; i < totalFiles; i++) {
+                    String filePathStr = restoredFiles.get(i);
                     if (filePathStr.startsWith("?")) continue;
 
                     Path filePath;
@@ -84,17 +88,13 @@ public class StrateMovingService {
                     String fileName = filePath.getFileName().toString();
                     String baseName = fileExtensionService.getFileNameWithoutExtension(fileName);
                     String ext = fileExtensionService.getFileExtension(fileName);
-
-                    // 🔹 Chaque fichier a son propre dossier parent basé sur son nom nettoyé
                     String cleanFolderName = cleanName(fileName);
                     if (cleanFolderName.isEmpty()) cleanFolderName = "UNKNOWN";
 
                     Path targetDir = destinationRoot.resolve(cleanFolderName);
                     Files.createDirectories(targetDir);
-
                     Path targetFile = targetDir.resolve(fileName);
 
-                    // 🔹 Gestion des collisions de fichiers dans le même dossier
                     int counter = 1;
                     while (Files.exists(targetFile)) {
                         targetFile = targetDir.resolve(baseName + "_" + counter + ext);
@@ -104,17 +104,24 @@ public class StrateMovingService {
                     try {
                         Files.move(filePath, targetFile, StandardCopyOption.REPLACE_EXISTING);
                         movedCount++;
-                        System.out.println("Moved: " + targetFile);
                     } catch (IOException e) {
-                        System.err.println("Failed to move file: " + filePath);
                         e.printStackTrace();
                     }
+
+                    // ⚡ Mettre à jour la ProgressBar et le Label
+                    int finalI = i;
+                    int finalMovedCount = movedCount;
+                    Platform.runLater(() -> {
+                        exportProgressBar.setProgress((double) (finalI + 1) / totalFiles);
+                        strateStatusLabel.setText("Status: Moving file " + (finalI + 1) + "/" + totalFiles);
+                    });
                 }
 
-                int finalMovedCount = movedCount;
+                int finalMovedCount1 = movedCount;
                 Platform.runLater(() -> {
-                    strateStatusLabel.setText("Status: " + finalMovedCount + " file(s) moved successfully!");
+                    strateStatusLabel.setText("Status: " + finalMovedCount1 + " file(s) moved successfully!");
                     moveFilesButton.setDisable(false);
+                    exportProgressBar.setVisible(false);
                 });
 
             } catch (Exception e) {
@@ -122,6 +129,7 @@ public class StrateMovingService {
                 Platform.runLater(() -> {
                     strateStatusLabel.setText("Status: Error during file moving.");
                     moveFilesButton.setDisable(false);
+                    exportProgressBar.setVisible(false);
                 });
             }
         }).start();
