@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.*;
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class FileExtensionService {
 
@@ -128,4 +130,149 @@ public class FileExtensionService {
         int dotIndex = fileName.lastIndexOf('.');
         return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
     }
+
+    public boolean changeSingleFileExtension(File file, String newExtension) {
+        if (file == null || !file.exists() || newExtension == null || newExtension.isEmpty()) {
+            return false;
+        }
+
+        if (newExtension.startsWith(".")) newExtension = newExtension.substring(1);
+
+        boolean isHeic = isActuallyHeic(file)
+                || getFileExtension(file).equalsIgnoreCase(".heic")
+                || getFileExtension(file).equalsIgnoreCase(".jpg")
+                || getFileExtension(file).equalsIgnoreCase(".jpeg");
+
+        File outputFile = new File(file.getParentFile(),
+                getFileNameWithoutExtension(file) + "." + newExtension);
+
+        if (isHeic) {
+            // Essayer ImageMagick
+            if (convertWithImageMagick(file, outputFile)) {
+                return true;
+            }
+            // fallback avec heif-dec.exe
+            return convertWithHeifDec(file, outputFile);
+        } else {
+            // simple renommage
+            Path source = file.toPath();
+            Path target = source.resolveSibling(getFileNameWithoutExtension(file) + "." + newExtension);
+            try {
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Conversion fallback via heif-dec.exe
+     */
+    private boolean convertWithHeifDec(File inputFile, File outputFile) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    "heif-dec.exe",
+                    inputFile.getAbsolutePath(),
+                    outputFile.getAbsolutePath()
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) System.out.println(line);
+            }
+
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                System.out.println("Converted via heif-dec.exe: " + outputFile.getAbsolutePath());
+                return true;
+            } else {
+                System.err.println("heif-dec.exe failed for: " + inputFile.getAbsolutePath());
+                return false;
+            }
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Vérifie si heif-convert est installé et accessible
+     */
+    private boolean isHeifConvertAvailable() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("heif-convert", "--version");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            p.waitFor();
+            return p.exitValue() == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Conversion via heif-convert
+     */
+    private boolean convertWithHeifConvert(File inputFile, File outputFile) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    "heif-convert",
+                    inputFile.getAbsolutePath(),
+                    outputFile.getAbsolutePath()
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            // Affiche le log
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                }
+            }
+
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                System.out.println("Converted via heif-convert: " + outputFile.getAbsolutePath());
+                return true;
+            } else {
+                System.err.println("heif-convert failed for: " + inputFile.getAbsolutePath());
+                return false;
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+
+    public boolean isActuallyHeic(File file) {
+        if (file == null || !file.exists()) return false;
+        String ext = getFileExtension(file).toLowerCase();
+
+        // Déjà .heic → vrai HEIC
+        if (ext.equals(".heic")) return true;
+
+        // Sinon on vérifie le type MIME pour les jpg/jpeg
+        if (ext.equals(".jpg") || ext.equals(".jpeg")) {
+            try {
+                Path path = file.toPath();
+                String mime = Files.probeContentType(path);
+                return mime != null && mime.equals("image/heic");
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+
 }

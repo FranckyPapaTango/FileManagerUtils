@@ -37,8 +37,7 @@ public class FileManagerController {
     @FXML
     private TextField extensionField;
 
-    @FXML
-    private TextField selectedDirectoryField;
+    // @FXML private TextField selectedDirectoryField;
 
     @FXML
     private TextField selectedImagesField;
@@ -61,19 +60,16 @@ public class FileManagerController {
     @FXML
     private TextField subdivisionCountField;
 
-    @FXML
-    private Label totalFilesLabel;
+    // @FXML private Label totalFilesLabel;
 
-    @FXML
-    private Label filesPerFolderLabel;
+    // @FXML private Label filesPerFolderLabel;
 
-    @FXML
-    private Label remainingFilesLabel;
+    // @FXML private Label remainingFilesLabel;
 
     @FXML
     private Label distributionStatusLabel;
 
-    @FXML private Button startDistributionButton;
+   // @FXML private Button startDistributionButton;
 
 
     private File selectedDirectory2; // pour la fonctionnalité de génération .txt de liste de fullpathname de fichier d'images
@@ -114,24 +110,93 @@ public class FileManagerController {
 
     @FXML
     private void handleProceed() {
+
         if (selectedFiles == null || selectedFiles.isEmpty()) {
-            showMessage("No files selected", "Error");
+            showMessage(Alert.AlertType.WARNING,
+                    "No files selected",
+                    "Please select files or a folder first.");
             return;
         }
 
-        String newExtension = extensionField.getText().trim();
-        if (newExtension.isEmpty()) {
-            showMessage("Extension field is empty", "Error");
+        String newExtension = extensionField.getText();
+        if (newExtension == null || newExtension.trim().isEmpty()) {
+            showMessage(Alert.AlertType.WARNING,
+                    "Invalid extension",
+                    "Please enter a valid extension.");
             return;
         }
 
-        boolean success = fileExtensionService.changeFilesExtension(selectedFiles, newExtension);
-        if (success) {
-            showMessage("Success!", "Information");
-        } else {
-            showMessage("An error occurred", "Error");
-        }
+        final String normalizedExtension =
+                newExtension.trim().replaceFirst("^\\.", "").toLowerCase();
+
+        progressBar.setProgress(0);
+        progressBar.setVisible(true);
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+
+                int total = selectedFiles.size();
+                int processed = 0;
+                StringBuilder failedFiles = new StringBuilder();
+
+                for (File file : selectedFiles) {
+                    boolean ok;
+                    try {
+                        ok = fileExtensionService.changeSingleFileExtension(file, normalizedExtension);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        ok = false;
+                    }
+
+                    if (!ok) {
+                        failedFiles.append(file.getAbsolutePath()).append("\n");
+                    }
+
+                    processed++;
+                    updateProgress(processed, total);
+                }
+
+                if (failedFiles.length() > 0) {
+                    final String failed = failedFiles.toString();
+                    Platform.runLater(() -> showMessage(
+                            Alert.AlertType.WARNING,
+                            "Some files could not be processed",
+                            failed
+                    ));
+                }
+
+                return null;
+            }
+        };
+
+        progressBar.progressProperty().bind(task.progressProperty());
+
+        task.setOnSucceeded(e -> {
+            progressBar.progressProperty().unbind();
+            progressBar.setVisible(false);
+
+            showMessage(Alert.AlertType.INFORMATION,
+                    "File Extension",
+                    "Processing completed.");
+        });
+
+        task.setOnFailed(e -> {
+            progressBar.progressProperty().unbind();
+            progressBar.setVisible(false);
+
+            showMessage(Alert.AlertType.ERROR,
+                    "File Extension",
+                    "An error occurred during processing.");
+        });
+
+        new Thread(task, "file-extension-task").start();
     }
+
+
+
+    @FXML
+    private ProgressBar progressBar;
 
     @FXML
     private void handleSelectDirectory() {
@@ -673,6 +738,15 @@ public class FileManagerController {
     private void showMessage(String message, String title) {
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, message, title, JOptionPane.INFORMATION_MESSAGE));
     }
+
+    private void showMessage(Alert.AlertType type, String title, String content) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
+
 
     private int showConfirmDialog(String message, String title) {
         final int[] result = new int[1];

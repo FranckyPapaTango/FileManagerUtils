@@ -114,6 +114,10 @@ tasks.named('run', JavaExec) {
 /* ==============================
    Développement / build workflow
 ============================== */
+
+// REREQUIS :
+// installer libheif-1.20.2-win64 et l//'ajouter au path de la variable d'environnement systeme
+
 /*
 1️⃣ Nettoyer caches et ancien build :
    .\gradlew --stop

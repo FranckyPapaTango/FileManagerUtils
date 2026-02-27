@@ -110,32 +110,35 @@
                       AnchorPane.leftAnchor="0"
                       AnchorPane.rightAnchor="0">
 
-                    <!-- HBox pour les boutons côte à côte -->
                     <HBox spacing="10" alignment="CENTER">
                         <Button text="Select Files" onAction="#handleSelectFiles"/>
                         <Button text="Select Folder" onAction="#handleSelectDirectory"/>
                     </HBox>
 
-                    <!-- TextArea dans un HBox pour contrôler la largeur -->
                     <HBox alignment="CENTER">
                         <TextArea fx:id="selectedFilesInfo"
                                   editable="false"
                                   prefRowCount="4"
                                   wrapText="true"
                                   promptText="Selected folder and number of files will appear here"
-                                  prefWidth="510"/> <!-- largeur fixe à moitié environ -->
+                                  prefWidth="510"/>
                     </HBox>
 
-                    <!-- HBox pour l'extension -->
                     <HBox spacing="10" alignment="CENTER">
                         <Label text="File Extension:"/>
                         <TextField fx:id="extensionField" prefWidth="150"/>
                     </HBox>
 
-                    <!-- Proceed button -->
                     <Button text="Proceed" onAction="#handleProceed"/>
 
+                    <!-- 👇 Progress bar -->
+                    <ProgressBar fx:id="progressBar"
+                                 prefWidth="510"
+                                 progress="0.0"
+                                 visible="false"/>
+
                 </VBox>
+
             </AnchorPane>
         </StackPane>
     </Tab>

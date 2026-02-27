@@ -1,0 +1,41 @@
+/* ==============================
+   Développement / build workflow
+============================== */
+
+// REREQUIS :
+// installer libheif-1.20.2-win64 et l//'ajouter au path de la variable d'environnement systeme
+
+/*
+1️⃣ Nettoyer caches et ancien build :
+   .\gradlew --stop
+   Remove-Item build, .gradle -Recurse -Force
+
+2️⃣ Vérifier JAVA_HOME vers Java 17
+   $env:JAVA_HOME="C:\Users\mashk\.sdkman\candidates\java\17.0.8-zulu"
+   $env:PATH="$env:JAVA_HOME\bin;$env:PATH"
+   java -version
+
+3️⃣ Générer FatJar
+   .\gradlew fatJar
+   Vérifier que le Jar fait plusieurs Mo
+
+4️⃣ Lancer le FatJar avec JavaFX
+   java --module-path "C:\javafx\javafx-sdk-17.0.18\lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics -jar build/libs/FileManagerUtils-1.0.0-all.jar
+
+5️⃣ Créer batch Windows pratique
+   .\gradlew createBat
+   Double-cliquer sur build/libs/FileManagerUtils.cmd pour lancer l’app
+
+6️⃣ Générer l’EXE installable via jpackage :
+
+
+
+ ** D'UN TRAIT (ALL IN ONE) :
+
+ .\gradlew --stop
+   Remove-Item build, .gradle -Recurse -Force
+   .\gradlew fatJar
+ .\gradlew createBat
+ .\gradlew jpackageInstaller
+
+*/
