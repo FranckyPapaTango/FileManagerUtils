@@ -8,6 +8,10 @@ import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -15,11 +19,13 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.commons.imaging.Imaging;
@@ -66,25 +72,76 @@ public class FileManagerController {
         updateSelectedFilesInfo();
     }
 
+
     @FXML
     private void handleSelectDirectory() {
+
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Folder");
+        File dir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
+
+        if (dir == null) {
+            return;
+        }
+
         selectedFiles.clear();
-        selectedDirectory = null;
-        selectedFilesInfo.clear();
+        selectedDirectory = dir;
+
+        File[] files = dir.listFiles((d, name) -> {
+            String lower = name.toLowerCase();
+            return lower.endsWith(".png")
+                    || lower.endsWith(".jpg")
+                    || lower.endsWith(".jpeg");
+        });
+
+        if (files == null || files.length == 0) {
+            messageService.showMessage(
+                    Alert.AlertType.INFORMATION,
+                    "No images",
+                    "No image files found in selected folder."
+            );
+            return;
+        }
+
+        selectedFiles.addAll(Arrays.asList(files));
+
+        progressBar.progressProperty().unbind();
         progressBar.setProgress(0);
         progressBar.setVisible(false);
 
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Directory");
-        File dir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
-
-        if (dir != null && dir.isDirectory()) {
-            selectedDirectory = dir;
-            File[] filesArray = dir.listFiles(File::isFile);
-            if (filesArray != null) selectedFiles.addAll(List.of(filesArray));
-        }
         updateSelectedFilesInfo();
     }
+
+    /**
+     * Méthode robuste de conversion PNG -> JPG
+     */
+        private void convertToJpgRobuste(File inputFile, File outputFile) throws IOException {
+            BufferedImage inputImage = ImageIO.read(inputFile);
+            if (inputImage == null) {
+                System.err.println("Impossible de lire l'image : " + inputFile.getName());
+                return;
+            }
+
+            int width = inputImage.getWidth();
+            int height = inputImage.getHeight();
+
+            // Crée directement un BufferedImage TYPE_INT_RGB pour JPG
+            BufferedImage convertedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+
+            // Graphics2D avec rendu rapide et fond blanc
+            Graphics2D g2d = convertedImage.createGraphics();
+            g2d.setBackground(Color.WHITE); // définit le fond
+            g2d.clearRect(0, 0, width, height); // remplit le fond en blanc
+
+            // Dessine l'image PNG sur le fond blanc
+            g2d.drawImage(inputImage, 0, 0, null);
+            g2d.dispose();
+
+            // Écriture optimisée en JPG
+            try (OutputStream os = new BufferedOutputStream(new FileOutputStream(outputFile))) {
+                ImageIO.write(convertedImage, "jpg", os);
+            }
+        }
 
     private void updateSelectedFilesInfo() {
         StringBuilder info = new StringBuilder();

@@ -10,42 +10,104 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.List;
 
 public class FileExtensionService {
+
+    static {
+        ImageIO.setUseCache(false);
+    }
+
 
     private final MessageService messageService = new MessageService();
 
     /* =========================================================
        EXTENSION / CONVERSION SÉCURISÉE
        ========================================================= */
-    public boolean changeSingleFileExtension(File file, String newExtension) {
-        if (file == null || !file.exists() || newExtension == null || newExtension.isEmpty()) return false;
+    public boolean changeSingleFileExtension(File file, String newExtension, File corruptedDir) {
+        if (file == null || !file.exists() || newExtension == null || newExtension.isEmpty()) {
+            return false;
+        }
 
         newExtension = newExtension.replaceFirst("^\\.", "").toLowerCase();
         String srcExt = getFileExtension(file).toLowerCase();
-        File outputFile = new File(file.getParentFile(), getFileNameWithoutExtension(file) + "." + newExtension);
+        File parentDir = file.getParentFile();
+        File outputFile = new File(parentDir, getFileNameWithoutExtension(file) + "." + newExtension);
 
         try {
-            /* ---------- PNG → JPG ---------- */
+            // --- PNG → JPG ---
             if (srcExt.equals(".png") && newExtension.equals("jpg")) {
-                return convertToJpg(file, outputFile);
+                boolean converted = false;
+
+                try { convertToJpg(file); converted = true; } catch (IOException ignored) {}
+
+                if (!converted) {
+                    File tempFile = new File(parentDir, getFileNameWithoutExtension(file) + "_repaired.png");
+                    if (repairImageWithMagick(file, tempFile)) {
+                        try { convertToJpg(tempFile); converted = true; } catch (IOException ignored) {}
+                    }
+                    tempFile.delete();
+                }
+
+                if (converted) { Files.deleteIfExists(file.toPath()); return true; }
+                throw new IOException("PNG → JPG conversion failed after repair attempts");
             }
 
-            /* ---------- PNG → WEBP et HEIC / JPG / JPEG ---------- */
+            // --- HEIC / JPEG / JPG ---
             boolean isHeic = isActuallyHeic(file) || srcExt.equals(".heic") || srcExt.equals(".jpg") || srcExt.equals(".jpeg");
             if (isHeic) {
-                if (convertWithImageMagick(file, outputFile)) return true;
-                return convertWithHeifDec(file, outputFile);
+                boolean success = convertWithImageMagick(file, outputFile) || convertWithHeifDec(file, outputFile);
+                if (success) { Files.deleteIfExists(file.toPath()); return true; }
+                throw new IOException("HEIC/IM conversion failed");
             }
 
-            /* ---------- AUTRES → RENOMMAGE SIMPLE ---------- */
+            // --- AUTRES: simple renommage ---
             if (!file.toPath().equals(outputFile.toPath())) {
                 Files.move(file.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
             return true;
 
-        } catch (IOException e) {
+        } catch (Exception e) {
+            System.err.println("Conversion failed: " + file.getName() + " (" + e.getMessage() + ")");
+            // 📁 Déplace dans corrupted/
+            try {
+                Path target = corruptedDir.toPath().resolve(file.getName());
+                int count = 1;
+                String name = getFileNameWithoutExtension(file);
+                String ext = getFileExtension(file);
+                while (Files.exists(target)) {
+                    target = corruptedDir.toPath().resolve(name + "_" + count + ext);
+                    count++;
+                }
+                Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+                System.err.println("Moved to corrupted/: " + target.getFileName());
+            } catch (IOException moveEx) {
+                System.err.println("Failed to move corrupted file: " + file.getName() + " (" + moveEx.getMessage() + ")");
+            }
+            try { Files.deleteIfExists(outputFile.toPath()); } catch (IOException ignored) {}
+            return false;
+        }
+    }
+
+    /**
+     * Tente de réparer un PNG corrompu avec ImageMagick en ignorant les CRC.
+     */
+    private boolean repairImageWithMagick(File inputFile, File outputFile) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    "magick",
+                    inputFile.getAbsolutePath(),
+                    "-define", "png:ignore-crc=TRUE",
+                    "-background", "white",
+                    "-alpha", "remove",
+                    outputFile.getAbsolutePath()
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            process.waitFor();
+            return process.exitValue() == 0 && outputFile.exists();
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -104,20 +166,51 @@ public class FileExtensionService {
         }
     }
 
-    private boolean convertToJpg(File inputFile, File outputFile) {
+    private void convertToJpg(File inputFile) throws IOException {
+
+        File outputFile = new File(
+                inputFile.getParentFile(),
+                getFileNameWithoutExtension(inputFile) + ".jpg"
+        );
+
+        BufferedImage inputImage;
         try {
-            BufferedImage src = ImageIO.read(inputFile);
-            if (src == null) return false;
+            inputImage = ImageIO.read(inputFile);
+            if (inputImage == null) {
+                throw new IOException("ImageIO returned null");
+            }
+        } catch (Exception e) {
+            throw new IOException("ImageIO failed", e);
+        }
 
-            BufferedImage jpg = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_RGB);
-            Graphics2D g = jpg.createGraphics();
-            g.setColor(Color.WHITE);
-            g.fillRect(0, 0, src.getWidth(), src.getHeight());
-            g.drawImage(src, 0, 0, null);
-            g.dispose();
+        // 🔥 Gestion transparence PNG
+        BufferedImage convertedImage = new BufferedImage(
+                inputImage.getWidth(),
+                inputImage.getHeight(),
+                BufferedImage.TYPE_INT_RGB
+        );
 
-            return ImageIO.write(jpg, "jpg", outputFile);
-        } catch (IOException e) {
+        Graphics2D g2d = convertedImage.createGraphics();
+        g2d.setColor(java.awt.Color.WHITE);
+        g2d.fillRect(0, 0, convertedImage.getWidth(), convertedImage.getHeight());
+        g2d.drawImage(inputImage, 0, 0, null);
+        g2d.dispose();
+
+        if (!ImageIO.write(convertedImage, "jpg", outputFile)) {
+            throw new IOException("ImageIO write failed");
+        }
+    }
+
+    /**
+     * Tentative de réparation via ImageMagick
+     */
+    private boolean repairImage(File imageFile) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("magick", "convert",
+                    imageFile.getAbsolutePath(), imageFile.getAbsolutePath());
+            Process process = pb.start();
+            return process.waitFor() == 0;
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
             return false;
         }
@@ -163,10 +256,27 @@ public class FileExtensionService {
             protected Void call() {
                 int total = selectedFiles.size();
                 int processed = 0;
+
+                // 💾 Crée corrupted/ une seule fois
+                File parentDir = selectedFiles.get(0).getParentFile();
+                File corruptedDir = new File(parentDir, "corrupted");
+                if (!corruptedDir.exists()) corruptedDir.mkdirs();
+
+                List<File> corruptedFiles = new ArrayList<>();
+
                 for (File file : selectedFiles) {
-                    changeSingleFileExtension(file, normalizedExtension);
+                    boolean success = changeSingleFileExtension(file, normalizedExtension, corruptedDir);
+                    if (!success) {
+                        corruptedFiles.add(new File(corruptedDir, file.getName()));
+                    }
                     updateProgress(++processed, total);
                 }
+
+                // 🛠 Réécriture finale / réparation des fichiers corrompus
+                if (!corruptedFiles.isEmpty()) {
+                    new CorruptedRepairService().repairCorruptedFolder(corruptedDir);
+                }
+
                 return null;
             }
         };
