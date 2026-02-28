@@ -1,24 +1,20 @@
 package com.rafaros.filemanagerutils.service;
 
+
 import javafx.application.Platform;
-import javafx.concurrent.Task;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
+import javafx.scene.control.*;
 import javafx.stage.DirectoryChooser;
 
-import javax.swing.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class StrateMovingService {
 
     private final FileExtensionService fileExtensionService = new FileExtensionService();
-
+    private MessageService messageService = new MessageService();
 
     public void handleMoveFiles(Label strateStatusLabel, Button moveFilesButton, Path destinationRoot, ProgressBar exportProgressBar) {
 
@@ -218,7 +214,7 @@ public class StrateMovingService {
                     exportRecycleBinButton.setDisable(false);
                     if (exitCode == 0) {
                         strateStatusLabel.setText("Status: Recycle Bin restored successfully!");
-                        showMessage(
+                        messageService.showMessage(
                                 "Recycle Bin export completed.\n\n" +
                                         "✔ Files restored to original locations\n" +
                                         "✔ desktop_2.txt generated on Desktop",
@@ -226,7 +222,7 @@ public class StrateMovingService {
                         );
                     } else {
                         strateStatusLabel.setText("Status: PowerShell exited with code " + exitCode);
-                        showMessage(
+                        messageService.showMessage(
                                 "PowerShell exited with code: " + exitCode,
                                 "Error"
                         );
@@ -238,17 +234,13 @@ public class StrateMovingService {
                 Platform.runLater(() -> {
                     exportRecycleBinButton.setDisable(false);
                     strateStatusLabel.setText("Status: Error restoring Recycle Bin.");
-                    showMessage(
+                    messageService.showMessage(
                             "An error occurred while exporting/restoring the Recycle Bin.",
                             "Error"
                     );
                 });
             }
         }).start();
-    }
-
-    private void showMessage(String message, String title) {
-        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, message, title, JOptionPane.INFORMATION_MESSAGE));
     }
 
 
@@ -289,8 +281,6 @@ public class StrateMovingService {
                     // espaces propres
                     .replaceAll("\\s+", " ")
                     .trim();
-
-
 
             if (cleanFolderName.isEmpty()) cleanFolderName = "UNKNOWN";
 
@@ -347,6 +337,48 @@ public class StrateMovingService {
         }
 
         strateStatusLabel.setText("Status: " + renamedCount + " folder(s) cleaned/merged.");
+    }
+
+    public void handleExportFolderList(TextArea selectedFilesInfo) {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Folder to Export List");
+
+        File selectedDir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
+        if (selectedDir == null || !selectedDir.isDirectory()) {
+            messageService.showMessage(Alert.AlertType.WARNING, "No folder selected", "Please select a valid folder.");
+            return;
+        }
+
+        // 🔹 Chemin EXACT comme dans StrateMovingService
+        Path outputPath = Paths.get(System.getProperty("user.home"), "OneDrive", "Desktop", "desktop_2.txt");
+
+        try {
+            // Assure que le dossier Desktop existe
+            Files.createDirectories(outputPath.getParent());
+
+            try (BufferedWriter writer = Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)) {
+                Files.walk(selectedDir.toPath())
+                        .filter(Files::isRegularFile)
+                        .forEach(path -> {
+                            try {
+                                writer.write(path.toAbsolutePath().toString());
+                                writer.newLine();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        });
+            }
+
+            messageService.showMessage(Alert.AlertType.INFORMATION,
+                    "Export Completed",
+                    "File list exported to: " + outputPath.toAbsolutePath());
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            messageService.showMessage(Alert.AlertType.ERROR,
+                    "Error",
+                    "Failed to export file list: " + e.getMessage());
+        }
     }
 
 }

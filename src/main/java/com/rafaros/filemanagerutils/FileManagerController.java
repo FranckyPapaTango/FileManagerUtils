@@ -1,9 +1,8 @@
 package com.rafaros.filemanagerutils;
 
 import com.rafaros.filemanagerutils.service.FileExtensionService;
+import com.rafaros.filemanagerutils.service.MessageService;
 import com.rafaros.filemanagerutils.service.StrateMovingService;
-import com.sun.javafx.charts.Legend;
-import com.sun.javafx.menu.MenuItemBase;
 import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -20,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
 
@@ -35,20 +33,10 @@ public class FileManagerController {
 
 
     private StrateMovingService strateMovingService = new StrateMovingService();
-
-    @FXML
-    private TextField extensionField;
-
-    // @FXML private TextField selectedDirectoryField;
+    private MessageService messageService = new MessageService();
 
     @FXML
     private TextField selectedImagesField;
-
-    @FXML
-    private CheckBox gatherInContainerCheckbox;
-
-    @FXML
-    private TextField containerNameField;
 
     @FXML
     private Label locationLabel;
@@ -62,29 +50,29 @@ public class FileManagerController {
     @FXML
     private TextField subdivisionCountField;
 
-    // @FXML private Label totalFilesLabel;
-
-    // @FXML private Label filesPerFolderLabel;
-
-    // @FXML private Label remainingFilesLabel;
-
     @FXML
     private Label distributionStatusLabel;
 
-   // @FXML private Button startDistributionButton;
-
-
     private File selectedDirectory2; // pour la fonctionnalité de génération .txt de liste de fullpathname de fichier d'images
+
+    /*=============================================================================
+    ====================  FILE EXTENSION  =========================================
+    ==============================================================================*/
+
     private final FileExtensionService fileExtensionService = new FileExtensionService();
-
     private List<File> selectedFiles = new ArrayList<>();
-
-    // private List<File> selectedFiles;
     private File selectedDirectory;
     private File containerDirectory;
-
+    @FXML
+    private TextField extensionField;
     @FXML
     private TextArea selectedFilesInfo;
+    @FXML
+    private ProgressBar progressBar;
+    @FXML
+    private CheckBox gatherInContainerCheckbox;
+    @FXML
+    private TextField containerNameField;
 
     @FXML
     private void handleSelectFiles() {
@@ -109,96 +97,10 @@ public class FileManagerController {
         updateSelectedFilesInfo();
     }
 
-
     @FXML
     private void handleProceed() {
-
-        if (selectedFiles == null || selectedFiles.isEmpty()) {
-            showMessage(Alert.AlertType.WARNING,
-                    "No files selected",
-                    "Please select files or a folder first.");
-            return;
-        }
-
-        String newExtension = extensionField.getText();
-        if (newExtension == null || newExtension.trim().isEmpty()) {
-            showMessage(Alert.AlertType.WARNING,
-                    "Invalid extension",
-                    "Please enter a valid extension.");
-            return;
-        }
-
-        final String normalizedExtension =
-                newExtension.trim().replaceFirst("^\\.", "").toLowerCase();
-
-        progressBar.setProgress(0);
-        progressBar.setVisible(true);
-
-        Task<Void> task = new Task<>() {
-            @Override
-            protected Void call() {
-
-                int total = selectedFiles.size();
-                int processed = 0;
-                StringBuilder failedFiles = new StringBuilder();
-
-                for (File file : selectedFiles) {
-                    boolean ok;
-                    try {
-                        ok = fileExtensionService.changeSingleFileExtension(file, normalizedExtension);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        ok = false;
-                    }
-
-                    if (!ok) {
-                        failedFiles.append(file.getAbsolutePath()).append("\n");
-                    }
-
-                    processed++;
-                    updateProgress(processed, total);
-                }
-
-                if (failedFiles.length() > 0) {
-                    final String failed = failedFiles.toString();
-                    Platform.runLater(() -> showMessage(
-                            Alert.AlertType.WARNING,
-                            "Some files could not be processed",
-                            failed
-                    ));
-                }
-
-                return null;
-            }
-        };
-
-        progressBar.progressProperty().bind(task.progressProperty());
-
-        task.setOnSucceeded(e -> {
-            progressBar.progressProperty().unbind();
-            progressBar.setVisible(false);
-
-            showMessage(Alert.AlertType.INFORMATION,
-                    "File Extension",
-                    "Processing completed.");
-        });
-
-        task.setOnFailed(e -> {
-            progressBar.progressProperty().unbind();
-            progressBar.setVisible(false);
-
-            showMessage(Alert.AlertType.ERROR,
-                    "File Extension",
-                    "An error occurred during processing.");
-        });
-
-        new Thread(task, "file-extension-task").start();
+       fileExtensionService.handleProceed(selectedFiles, extensionField, progressBar);
     }
-
-
-
-    @FXML
-    private ProgressBar progressBar;
 
     @FXML
     private void handleSelectDirectory() {
@@ -245,49 +147,12 @@ public class FileManagerController {
 
     @FXML
     private void handleRenameContent() {
-        if (selectedDirectory == null) {
-            showMessage("No directory selected", "Error");
-            return;
-        }
-
-        if (gatherInContainerCheckbox.isSelected()) {
-            String containerName = containerNameField.getText().trim();
-            while (true) {
-                if (containerName.isEmpty()) {
-                    showMessage("Container name is empty", "Error");
-                    return;
-                }
-                containerDirectory = new File(selectedDirectory, containerName);
-
-                // Vérifie si le répertoire de conteneur existe déjà
-                if (containerDirectory.exists()) {
-                    showMessage("Container directory already exists. Please define a different name.", "Error");
-                    return;
-
-                }
-
-                break;
-
-            }
-        }
-        int confirm = showConfirmDialog("Are you sure you want to rename the content of this directory?", "Confirmation");
-        if (confirm != JOptionPane.YES_OPTION) {
-            return;
-        }
-        // Crée le répertoire de conteneur s'il n'existe pas
-        if (!containerDirectory.mkdirs()) {
-            showMessage("Failed to create container directory", "Error");
-            return;
-        }
-        boolean success = renameFilesInDirectory(selectedDirectory);
-        if (success) {
-            showMessage("Success!", "Information");
-        } else {
-            showMessage("An error occurred", "Error");
-        }
+      fileExtensionService.handleRenameContent( selectedDirectory,  gatherInContainerCheckbox,  containerNameField,  containerDirectory);
     }
-
-
+    
+  /*============================================================================
+   ====================  REPAIR CORRUPTED IMAGES ===============================
+   =============================================================================*/
 
     @FXML
     private void handleSelectImages() {
@@ -454,28 +319,15 @@ public class FileManagerController {
     }
     @FXML
     private TextField restrictionField;
-
-
-
-
-
     @FXML
     private TextField destinationField;
-
     @FXML
     private Label strateStatusLabel;
-
     @FXML
     private Button moveFilesButton;
-
-
     @FXML
     private ProgressBar distributionProgressBar;
-
-
     private File distributionRootFolder;
-
-
 
     @FXML
     private void initialize() {
@@ -527,33 +379,6 @@ public class FileManagerController {
 
 
 
-
-
-/**
- * Renvoie le nom du fichier sans extension.
- *//*
-
-    private String getFileNameWithoutExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
-    }
-
-    */
-    /**
-     * Renvoie l'extension avec le point, ex: ".png"
-     *//*
-
-    private String getFileExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
-    }
-*/
-
-
-
-
-
-
     private boolean repairImage(File imageFile) {
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(
@@ -569,191 +394,6 @@ public class FileManagerController {
         }
     }
 
-    /*private boolean changeFilesExtension(List<File> files, String newExtension) {
-        try {
-            for (File file : files) {
-                Path source = file.toPath();
-                String newFileName = getFileNameWithoutExtension(file) + "." + newExtension;
-                Files.move(source, source.resolveSibling(newFileName));
-            }
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }*/
-
-    // --- surcharge pour String ---
-    /*private String getFileNameWithoutExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
-    }*/
-
-    // --- garde les versions pour File ---
-    /*private String getFileNameWithoutExtension(File file) {
-        return fileExtensionService.getFileNameWithoutExtension(file.getName());
-    }*/
-
-    private void showMessage(String message, String title) {
-        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, message, title, JOptionPane.INFORMATION_MESSAGE));
-    }
-
-    private void showMessage(Alert.AlertType type, String title, String content) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(content);
-        alert.showAndWait();
-    }
-
-
-    private int showConfirmDialog(String message, String title) {
-        final int[] result = new int[1];
-        try {
-            SwingUtilities.invokeAndWait(() -> {
-                result[0] = JOptionPane.showConfirmDialog(null, message, title, JOptionPane.YES_NO_OPTION);
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-            result[0] = JOptionPane.NO_OPTION;
-        }
-        return result[0];
-    }
-
-    private boolean renameFilesInDirectory(File directory) {
-        try {
-            renameFilesRecursively(directory);
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-//    private void renameFilesRecursively(File directory) throws IOException {
-//        File[] files = directory.listFiles();
-//        if (files == null) return;
-//
-//        for (int i = 0; i < files.length; i++) {
-//            File file = files[i];
-//            if (file.isDirectory()) {
-//                renameFilesRecursively(file);
-//            } else {
-//                String newFileName = directory.getName() + "_" + (i + 1) + getFileExtension(file);
-//                Path source = file.toPath();
-//                Path target;
-//                if (gatherInContainerCheckbox.isSelected() && containerDirectory != null) {
-//                    target = containerDirectory.toPath().resolve(newFileName);
-//                } else {
-//                    target = source.resolveSibling(newFileName);
-//                }
-//
-//                // Vérifie si le fichier cible existe déjà
-//                if (Files.exists(target)) {
-//                    System.out.println("File already exists: " + target);
-//                    continue; // Passe au fichier suivant
-//                }
-//
-//                // Déplacer le fichier
-//                try {
-//                    Files.move(source, target);
-//                } catch (IOException e) {
-//                    System.err.println("Failed to move file: " + source);
-//                    e.printStackTrace();
-//                }
-//            }
-//        }
-//    }
-
-    /*private String getFileExtension(File file) {
-        String fileName = file.getName();
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
-    }*/
-    // --- surcharge pour String ---
-    /*private String getFileExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
-    }*/
-
-
-// ---------------------------
-// Déplacement des fichiers depuis une liste .txt
-// ---------------------------
-//        public void moveFilesFromList(Path destinationRoot) throws IOException {
-//
-//            Path recycleRoot = Paths.get("C:\\$Recycle.Bin");
-//
-//            Files.walkFileTree(recycleRoot, new SimpleFileVisitor<Path>() {
-//                @Override
-//                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-//                    if (file.getFileName().toString().startsWith("$I")) {
-//                        try {
-//                            // ton code pour lire et restaurer le fichier
-//                            String originalPath = readOriginalPathFromIFile(file);
-//                            System.out.println("Found: " + originalPath);
-//                        } catch (IOException e) {
-//                            e.printStackTrace();
-//                        }
-//                    }
-//                    return FileVisitResult.CONTINUE;
-//                }
-//
-//                @Override
-//                public FileVisitResult visitFileFailed(Path file, IOException exc) {
-//                    // Ignore les fichiers/dossiers inaccessibles
-//                    System.err.println("Skipped inaccessible file/folder: " + file);
-//                    return FileVisitResult.CONTINUE;
-//                }
-//            });
-//        }
-
-
-
-    // ---------------------------
-    // Renommage des fichiers dans un dossier
-    // ---------------------------
-    private void renameFilesRecursively(File directory) throws IOException {
-        File[] files = directory.listFiles();
-        if (files == null) return;
-
-        for (int i = 0; i < files.length; i++) {
-            File file = files[i];
-            if (file.isDirectory()) {
-                renameFilesRecursively(file);
-            } else {
-                String newFileName = directory.getName() + fileExtensionService.getFileExtension(file);
-
-                Path source = file.toPath();
-                Path target;
-
-                if (gatherInContainerCheckbox.isSelected() && containerDirectory != null) {
-                    target = containerDirectory.toPath().resolve(newFileName);
-                } else {
-                    target = source.resolveSibling(newFileName);
-                }
-
-                // Gestion des collisions de fichiers
-                int counter = 1;
-                String nameWithoutExt = fileExtensionService.getFileNameWithoutExtension(newFileName);
-                String ext = fileExtensionService.getFileExtension(newFileName);
-
-                while (Files.exists(target)) {
-                    String indexedName = nameWithoutExt + "_" + counter + ext;
-                    target = target.getParent().resolve(indexedName);
-                    counter++;
-                }
-
-                // Déplacer le fichier
-                try {
-                    Files.move(source, target);
-                } catch (IOException e) {
-                    System.err.println("Failed to move file: " + source);
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
 
     /*============================================================================
     ====================  LIST FILE STRATE MOVING =================================
@@ -802,45 +442,7 @@ public class FileManagerController {
 
     @FXML
     private void handleExportFolderList() {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Folder to Export List");
-
-        File selectedDir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
-        if (selectedDir == null || !selectedDir.isDirectory()) {
-            showMessage(Alert.AlertType.WARNING, "No folder selected", "Please select a valid folder.");
-            return;
-        }
-
-        // 🔹 Chemin EXACT comme dans StrateMovingService
-        Path outputPath = Paths.get(System.getProperty("user.home"), "OneDrive", "Desktop", "desktop_2.txt");
-
-        try {
-            // Assure que le dossier Desktop existe
-            Files.createDirectories(outputPath.getParent());
-
-            try (BufferedWriter writer = Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)) {
-                Files.walk(selectedDir.toPath())
-                        .filter(Files::isRegularFile)
-                        .forEach(path -> {
-                            try {
-                                writer.write(path.toAbsolutePath().toString());
-                                writer.newLine();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        });
-            }
-
-            showMessage(Alert.AlertType.INFORMATION,
-                    "Export Completed",
-                    "File list exported to: " + outputPath.toAbsolutePath());
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            showMessage(Alert.AlertType.ERROR,
-                    "Error",
-                    "Failed to export file list: " + e.getMessage());
-        }
+      this.strateMovingService.handleExportFolderList(selectedFilesInfo);
     }
 
     @FXML
@@ -853,7 +455,7 @@ public class FileManagerController {
         recycleBinToggle.setText(active ? "RecycleBin On" : "RecycleBin Off");
     }
     /*============================================================================
-    ==============================================================================
+    =================== FOLDER CONTENT DISTRIBUTOR ===============================
     ==============================================================================*/
 
 
@@ -1024,6 +626,11 @@ public class FileManagerController {
 
         new Thread(task).start();
     }
+
+    /*============================================================================
+    ====================    (HOME PRESENTATION)  =================================
+    =============================================================================*/
+
 
     @FXML
     private VBox presentationCard;
