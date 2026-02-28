@@ -13,7 +13,6 @@ import java.util.stream.Stream;
 
 public class StrateMovingService {
 
-    private final FileExtensionService fileExtensionService = new FileExtensionService();
     private MessageService messageService = new MessageService();
 
     public void handleMoveFiles(Label strateStatusLabel, Button moveFilesButton, Path destinationRoot, ProgressBar exportProgressBar) {
@@ -82,8 +81,8 @@ public class StrateMovingService {
                     if (!Files.exists(filePath)) continue;
 
                     String fileName = filePath.getFileName().toString();
-                    String baseName = fileExtensionService.getFileNameWithoutExtension(fileName);
-                    String ext = fileExtensionService.getFileExtension(fileName);
+                    String baseName = getFileNameWithoutExtension(fileName);
+                    String ext = getFileExtension(fileName);
                     String cleanFolderName = cleanName(fileName);
                     if (cleanFolderName.isEmpty()) cleanFolderName = "UNKNOWN";
 
@@ -136,7 +135,7 @@ public class StrateMovingService {
      * Nettoie le nom du fichier pour générer un nom de dossier valide.
      */
     private String cleanName(String fileName) {
-        String name = fileExtensionService.getFileNameWithoutExtension(fileName).trim();
+        String name = getFileNameWithoutExtension(fileName).trim();
         boolean changed;
         do {
             String before = name;
@@ -299,8 +298,8 @@ public class StrateMovingService {
                                 }
 
                                 Path targetFile = targetDir.resolve(file.getFileName());
-                                String nameWithoutExt = fileExtensionService.getFileNameWithoutExtension(file.getFileName().toString());
-                                String ext = fileExtensionService.getFileExtension(file.getFileName().toString());
+                                String nameWithoutExt = getFileNameWithoutExtension(file.getFileName().toString());
+                                String ext = getFileExtension(file.getFileName().toString());
                                 int counter = 1;
 
                                 while (Files.exists(targetFile)) {
@@ -380,5 +379,18 @@ public class StrateMovingService {
                     "Failed to export file list: " + e.getMessage());
         }
     }
+
+
+    public String getFileNameWithoutExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
+    }
+
+    public String getFileExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
+    }
+
+
 
 }

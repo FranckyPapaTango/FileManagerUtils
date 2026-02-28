@@ -22,53 +22,6 @@ public class FileExtensionService {
     private MessageService messageService = new MessageService();
 
     /**
-     * Change l'extension de tous les fichiers dans la liste.
-     * Si le fichier est HEIC ou JPG, utilise ImageMagick pour convertir en JPEG 24bpp.
-     * Pour les autres extensions, conserve le comportement existant.
-     *
-     * @param files        liste de fichiers
-     * @param newExtension nouvelle extension sans le point
-     * @return true si tout s'est bien passé, false sinon
-     */
-    public boolean changeFilesExtension(List<File> files, String newExtension) {
-        if (files == null || files.isEmpty() || newExtension == null || newExtension.isEmpty()) {
-            return false;
-        }
-
-        if (newExtension.startsWith(".")) {
-            newExtension = newExtension.substring(1);
-        }
-
-        boolean allSuccess = true;
-
-        for (File file : files) {
-            String ext = getFileExtension(file).toLowerCase();
-
-            // HEIC ou JPG → conversion ImageMagick
-            if (ext.equals(".heic") || ext.equals(".jpg") || ext.equals(".jpeg")) {
-                String outputFileName = getFileNameWithoutExtension(file) + "." + newExtension;
-                File outputFile = new File(file.getParentFile(), outputFileName);
-
-                boolean converted = convertWithImageMagick(file, outputFile);
-                if (!converted) allSuccess = false;
-
-            } else {
-                // Autres extensions → juste renommer
-                Path source = file.toPath();
-                Path target = source.resolveSibling(getFileNameWithoutExtension(file) + "." + newExtension);
-                try {
-                    Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    allSuccess = false;
-                }
-            }
-        }
-
-        return allSuccess;
-    }
-
-    /**
      * Utilise ImageMagick pour convertir une image en JPEG 24bpp
      */
     private boolean convertWithImageMagick(File inputFile, File outputFile) {
@@ -221,41 +174,6 @@ public class FileExtensionService {
             p.waitFor();
             return p.exitValue() == 0;
         } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * Conversion via heif-convert
-     */
-    private boolean convertWithHeifConvert(File inputFile, File outputFile) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    "heif-convert",
-                    inputFile.getAbsolutePath(),
-                    outputFile.getAbsolutePath()
-            );
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            // Affiche le log
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println(line);
-                }
-            }
-
-            int exitCode = process.waitFor();
-            if (exitCode == 0) {
-                System.out.println("Converted via heif-convert: " + outputFile.getAbsolutePath());
-                return true;
-            } else {
-                System.err.println("heif-convert failed for: " + inputFile.getAbsolutePath());
-                return false;
-            }
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
             return false;
         }
     }
