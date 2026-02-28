@@ -80,6 +80,8 @@ public class FileManagerController {
         selectedFiles.clear();
         selectedDirectory = null;
         selectedFilesInfo.clear();
+        progressBar.setProgress(0);
+        progressBar.setVisible(false);
 
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Files");
@@ -99,6 +101,14 @@ public class FileManagerController {
 
     @FXML
     private void handleProceed() {
+        if (selectedFiles == null || selectedFiles.isEmpty()) {
+            messageService.showMessage(
+                    Alert.AlertType.WARNING,
+                    "No files selected",
+                    "Please select files or a folder first."
+            );
+            return;
+        }
        fileExtensionService.handleProceed(selectedFiles, extensionField, progressBar);
     }
 
@@ -108,6 +118,8 @@ public class FileManagerController {
         selectedFiles.clear();
         selectedDirectory = null;
         selectedFilesInfo.clear();
+        progressBar.setProgress(0);
+        progressBar.setVisible(false);
 
         DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select Directory");
@@ -147,7 +159,8 @@ public class FileManagerController {
 
     @FXML
     private void handleRenameContent() {
-      fileExtensionService.handleRenameContent( selectedDirectory,  gatherInContainerCheckbox,  containerNameField,  containerDirectory);
+        containerDirectory = null; // 🔒 reset volontaire
+        fileExtensionService.handleRenameContent( selectedDirectory,  gatherInContainerCheckbox,  containerNameField,  containerDirectory);
     }
     
   /*============================================================================
