@@ -276,7 +276,7 @@
         </StackPane>
     </Tab>
 
-    <!-- 🔹 NEW TAB : Folder Content Distributor -->
+    <!-- 🔹TAB : Folder Content Distributor -->
     <Tab text="Folder Content Distributor" styleClass="tab-header-5" closable="false">
         <StackPane styleClass="tab-bg-5">
             <Pane styleClass="overlay"/>

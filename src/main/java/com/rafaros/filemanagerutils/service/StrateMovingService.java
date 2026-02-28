@@ -1,6 +1,5 @@
 package com.rafaros.filemanagerutils.service;
 
-
 import javafx.application.Platform;
 import javafx.scene.control.*;
 import javafx.stage.DirectoryChooser;
@@ -13,7 +12,7 @@ import java.util.stream.Stream;
 
 public class StrateMovingService {
 
-    private MessageService messageService = new MessageService();
+    private final MessageService messageService = new MessageService();
 
     public void handleMoveFiles(Label strateStatusLabel, Button moveFilesButton, Path destinationRoot, ProgressBar exportProgressBar) {
 
@@ -23,7 +22,6 @@ public class StrateMovingService {
         }
 
         moveFilesButton.setDisable(true);
-
         exportProgressBar.setProgress(0);
         exportProgressBar.setVisible(true);
         exportProgressBar.setManaged(true);
@@ -103,7 +101,6 @@ public class StrateMovingService {
                         e.printStackTrace();
                     }
 
-                    // ⚡ Mettre à jour la ProgressBar et le Label
                     int finalI = i;
                     int finalMovedCount = movedCount;
                     Platform.runLater(() -> {
@@ -117,6 +114,9 @@ public class StrateMovingService {
                     strateStatusLabel.setText("Status: " + finalMovedCount1 + " file(s) moved successfully!");
                     moveFilesButton.setDisable(false);
                     exportProgressBar.setVisible(false);
+                    messageService.showMessage(Alert.AlertType.INFORMATION,
+                            "Move Completed",
+                            finalMovedCount1 + " file(s) moved successfully.");
                 });
 
             } catch (Exception e) {
@@ -125,48 +125,38 @@ public class StrateMovingService {
                     strateStatusLabel.setText("Status: Error during file moving.");
                     moveFilesButton.setDisable(false);
                     exportProgressBar.setVisible(false);
+                    messageService.showMessage(Alert.AlertType.ERROR,
+                            "Error",
+                            "An error occurred during file moving.");
                 });
             }
         }).start();
     }
 
-
-    /**
-     * Nettoie le nom du fichier pour générer un nom de dossier valide.
-     */
     private String cleanName(String fileName) {
         String name = getFileNameWithoutExtension(fileName).trim();
         boolean changed;
         do {
             String before = name;
-            // 🔹 Supprime (123) en fin
             name = name.replaceAll("\\s*\\(\\d+\\)$", "");
-            // 🔹 Supprime _1, _12, _001 en fin
             name = name.replaceAll("_\\d+$", "");
-            // 🔹 Supprime chiffres collés en FIN de mot
             name = name.replaceAll("(\\p{L})\\d+$", "$1");
-            // 🔹 Supprime chiffres collés en DÉBUT de mot
             name = name.replaceAll("^\\d+(\\p{L})", "$1");
             name = name.trim();
             changed = !name.equals(before);
         } while (changed);
-        // 🔹 Nettoyage doux des bords seulement
+
         name = name.replaceAll(
                 "^[^\\p{L}\\p{N}\\+\\-_'() ]+|[^\\p{L}\\p{N}\\+\\-_'() ]+$",
                 ""
         );
-        // 🔒 PARANO MODE : normalisation des espaces Unicode chelous
-        name = name.replace('\u00A0', ' ')   // espace insécable
-                .replace('\u2007', ' ')   // espace figure
-                .replace('\u202F', ' ');  // espace fine insécable
-        // 🔹 Espaces propres (compression à 1)
+        name = name.replace('\u00A0', ' ')
+                .replace('\u2007', ' ')
+                .replace('\u202F', ' ');
         name = name.replaceAll("\\s+", " ").trim();
         if (name.isEmpty()) name = "UNKNOWN";
         return name;
     }
-
-
-
 
     public void handleExportRecycleBin(Button exportRecycleBinButton, Label strateStatusLabel) {
 
@@ -175,7 +165,6 @@ public class StrateMovingService {
         new Thread(() -> {
             try {
 
-                // 🔥 Script PowerShell pour restaurer la corbeille et lister les fichiers restaurés
                 String script =
                         "$desktopPath = [Environment]::GetFolderPath('Desktop')\n" +
                                 "$logFile = Join-Path $desktopPath 'desktop_2.txt'\n" +
@@ -187,7 +176,6 @@ public class StrateMovingService {
                                 "    if ($originalPath) {\n" +
                                 "        $fullPath = Join-Path $originalPath $item.Name\n" +
                                 "        $results += $fullPath\n" +
-                                "        # RESTAURATION RÉELLE\n" +
                                 "        $item.InvokeVerb(\"undelete\")\n" +
                                 "    }\n" +
                                 "}\n" +
@@ -206,25 +194,22 @@ public class StrateMovingService {
 
                 Process process = pb.start();
                 int exitCode = process.waitFor();
-
                 Files.deleteIfExists(tempScript);
 
                 Platform.runLater(() -> {
                     exportRecycleBinButton.setDisable(false);
                     if (exitCode == 0) {
                         strateStatusLabel.setText("Status: Recycle Bin restored successfully!");
-                        messageService.showMessage(
+                        messageService.showMessage(Alert.AlertType.INFORMATION,
+                                "Success",
                                 "Recycle Bin export completed.\n\n" +
                                         "✔ Files restored to original locations\n" +
-                                        "✔ desktop_2.txt generated on Desktop",
-                                "Success"
-                        );
+                                        "✔ desktop_2.txt generated on Desktop");
                     } else {
                         strateStatusLabel.setText("Status: PowerShell exited with code " + exitCode);
-                        messageService.showMessage(
-                                "PowerShell exited with code: " + exitCode,
-                                "Error"
-                        );
+                        messageService.showMessage(Alert.AlertType.ERROR,
+                                "Error",
+                                "PowerShell exited with code: " + exitCode);
                     }
                 });
 
@@ -233,16 +218,13 @@ public class StrateMovingService {
                 Platform.runLater(() -> {
                     exportRecycleBinButton.setDisable(false);
                     strateStatusLabel.setText("Status: Error restoring Recycle Bin.");
-                    messageService.showMessage(
-                            "An error occurred while exporting/restoring the Recycle Bin.",
-                            "Error"
-                    );
+                    messageService.showMessage(Alert.AlertType.ERROR,
+                            "Error",
+                            "An error occurred while exporting/restoring the Recycle Bin.");
                 });
             }
         }).start();
     }
-
-
 
     public void handleCleanFoldersName(Label strateStatusLabel) {
         DirectoryChooser chooser = new DirectoryChooser();
@@ -263,72 +245,45 @@ public class StrateMovingService {
 
         for (File subDir : subDirs) {
             String originalName = subDir.getName();
-
-            // Nettoyage du nom du dossier
-//            String cleanFolderName = originalName
-//                    .replaceAll("\\d+", "")                           // supprime les chiffres
-//                    .replaceAll("^[\\-_'+]+|[\\-_'+]+$", "")          // supprime _, -, ', + au début ou fin
-//                    .replaceAll("[()\\[\\]{}]", "")                  // supprime (), [], {}
-//                    .replaceAll("[^a-zA-Z0-9\\s\\-_'+]", "")         // garde lettres, chiffres, espaces, _, -, ', +
-//                    .replaceAll("\\s+", " ")                          // condense les espaces multiples
-//                    .trim();
             String cleanFolderName = originalName
-                    // supprime chiffres SEULEMENT s’ils sont seuls ou parasites
                     .replaceAll("\\d+", "")
-                    // supprime caractères NON lettres/chiffres aux BORDS seulement
                     .replaceAll("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$", "")
-                    // espaces propres
                     .replaceAll("\\s+", " ")
                     .trim();
-
             if (cleanFolderName.isEmpty()) cleanFolderName = "UNKNOWN";
 
             Path targetDir = parentDir.toPath().resolve(cleanFolderName);
 
             try {
                 if (Files.exists(targetDir)) {
-                    // Fusionner le contenu du dossier actuel dans le dossier existant
                     try (Stream<Path> files = Files.list(subDir.toPath())) {
                         files.forEach(file -> {
                             try {
-
-                                if (!Files.isWritable(file)) {
-                                    System.err.println("Locked or inaccessible file skipped: " + file);
-                                    return; // ✅ return "void" = OK
-                                }
-
+                                if (!Files.isWritable(file)) return;
                                 Path targetFile = targetDir.resolve(file.getFileName());
                                 String nameWithoutExt = getFileNameWithoutExtension(file.getFileName().toString());
                                 String ext = getFileExtension(file.getFileName().toString());
                                 int counter = 1;
-
                                 while (Files.exists(targetFile)) {
                                     targetFile = targetDir.resolve(nameWithoutExt + "_" + counter + ext);
                                     counter++;
                                 }
-
                                 Files.move(file, targetFile);
-
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
                         });
-
                     }
 
-                    // Supprimer le dossier seulement s'il est vide
                     File[] remaining = subDir.listFiles();
                     if (remaining == null || remaining.length == 0) {
                         Files.delete(subDir.toPath());
                     }
-
                     renamedCount++;
                 } else if (!originalName.equals(cleanFolderName)) {
-                    // Renommer le dossier si nécessaire
                     Files.move(subDir.toPath(), targetDir);
                     renamedCount++;
                 }
-                // sinon le dossier est déjà propre, on ne fait rien
             } catch (IOException e) {
                 System.err.println("Failed to process folder: " + subDir.getAbsolutePath());
                 e.printStackTrace();
@@ -348,11 +303,9 @@ public class StrateMovingService {
             return;
         }
 
-        // 🔹 Chemin EXACT comme dans StrateMovingService
         Path outputPath = Paths.get(System.getProperty("user.home"), "OneDrive", "Desktop", "desktop_2.txt");
 
         try {
-            // Assure que le dossier Desktop existe
             Files.createDirectories(outputPath.getParent());
 
             try (BufferedWriter writer = Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)) {
@@ -380,7 +333,6 @@ public class StrateMovingService {
         }
     }
 
-
     public String getFileNameWithoutExtension(String fileName) {
         int dotIndex = fileName.lastIndexOf('.');
         return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
@@ -390,7 +342,4 @@ public class StrateMovingService {
         int dotIndex = fileName.lastIndexOf('.');
         return (dotIndex == -1) ? "" : fileName.substring(dotIndex);
     }
-
-
-
 }
