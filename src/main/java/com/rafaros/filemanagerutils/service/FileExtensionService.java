@@ -369,4 +369,6 @@ public class FileExtensionService {
         int dot = name.lastIndexOf('.');
         return dot == -1 ? name : name.substring(0, dot);
     }
+
+
 }

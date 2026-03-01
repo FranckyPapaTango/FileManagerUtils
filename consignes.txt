@@ -39,3 +39,21 @@
  .\gradlew jpackageInstaller
 
 */
+
+
+
+Installer Pillow (si ce n’est pas déjà fait)
+Dans PowerShell:
+
+python -m pip install --upgrade pip
+python -m pip install pillow
+
+Où mettre le script Python (proprement)
+Option recommandée (pro & portable):
+
+FileManagerUtils/
+ ├─ src/
+ │   └─ main/
+ │       └─ resources/
+ │           └─ python/
+ │               └─ png_to_jpg_repair.py
