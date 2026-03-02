@@ -254,32 +254,61 @@ public class FileExtensionService {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
-                int total = selectedFiles.size();
-                int processed = 0;
-
-                // 💾 Crée corrupted/ une seule fois
                 File parentDir = selectedFiles.get(0).getParentFile();
                 File corruptedDir = new File(parentDir, "corrupted");
                 if (!corruptedDir.exists()) corruptedDir.mkdirs();
 
                 List<File> corruptedFiles = new ArrayList<>();
 
+                int phase1Total = selectedFiles.size();
+                int processed = 0;
+
+                // ======================
+                // PHASE 1 – CONVERSION
+                // ======================
                 for (File file : selectedFiles) {
                     boolean success = changeSingleFileExtension(file, normalizedExtension, corruptedDir);
                     if (!success) {
                         corruptedFiles.add(new File(corruptedDir, file.getName()));
                     }
-                    updateProgress(++processed, total);
+                    updateProgress(++processed, phase1Total + corruptedFiles.size());
                 }
 
-                // 🛠 Réécriture finale / réparation des fichiers corrompus
+                // ======================
+                // PHASE 2 – RÉPARATION
+                // ======================
                 if (!corruptedFiles.isEmpty()) {
-                    new CorruptedRepairService().repairCorruptedFolder(corruptedDir);
+                    int repairCount = 0;
+                    // CorruptedRepairService repairService = new CorruptedRepairService();
+                    for (File corrupted : corruptedFiles) {
+                        new CorruptedRepairService().repairCorruptedFolder(corruptedDir);// 🐍 Python / Magick
+                        updateProgress(++processed, phase1Total + corruptedFiles.size());
+                    }
                 }
 
                 return null;
             }
         };
+
+        task.setOnSucceeded(e -> {
+            progressBar.progressProperty().unbind();
+            progressBar.setProgress(1);
+
+            messageService.showMessage(
+                    Alert.AlertType.INFORMATION,
+                    "Process completed",
+                    "All files have been processed.\nCorrupted images were handled if possible."
+            );
+        });
+
+        task.setOnFailed(e -> {
+            progressBar.progressProperty().unbind();
+            messageService.showMessage(
+                    Alert.AlertType.ERROR,
+                    "Process failed",
+                    "An unexpected error occurred during processing."
+            );
+        });
 
         progressBar.progressProperty().bind(task.progressProperty());
         new Thread(task, "file-extension-task").start();
