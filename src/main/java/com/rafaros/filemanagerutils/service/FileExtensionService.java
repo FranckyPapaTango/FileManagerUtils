@@ -21,6 +21,7 @@ public class FileExtensionService {
 
 
     private final MessageService messageService = new MessageService();
+    private final CorruptedRepairService corruptedRepairService = new CorruptedRepairService();
 
     /* =========================================================
        EXTENSION / CONVERSION SÉCURISÉE
@@ -235,82 +236,127 @@ public class FileExtensionService {
     /* =========================================================
        UI HANDLER
        ========================================================= */
-    public void handleProceed(List<File> selectedFiles, TextField extensionField, ProgressBar progressBar) {
+    public void handleProceed(
+            List<File> selectedFiles,
+            TextField extensionField,
+            ProgressBar progressBar
+    ) {
         if (selectedFiles == null || selectedFiles.isEmpty()) {
-            messageService.showMessage(Alert.AlertType.WARNING, "No files selected", "Please select files or a folder first.");
+            messageService.showMessage(
+                    Alert.AlertType.WARNING,
+                    "No files selected",
+                    "Please select files or a folder first."
+            );
             return;
         }
 
         String newExtension = extensionField.getText();
         if (newExtension == null || newExtension.trim().isEmpty()) {
-            messageService.showMessage(Alert.AlertType.WARNING, "Invalid extension", "Please enter a valid extension.");
+            messageService.showMessage(
+                    Alert.AlertType.WARNING,
+                    "Invalid extension",
+                    "Please enter a valid extension."
+            );
             return;
         }
 
-        final String normalizedExtension = newExtension.trim().replaceFirst("^\\.", "").toLowerCase();
+        final String normalizedExtension =
+                newExtension.trim().replaceFirst("^\\.", "").toLowerCase();
+
         progressBar.setProgress(0);
         progressBar.setVisible(true);
 
         Task<Void> task = new Task<>() {
+
             @Override
             protected Void call() {
+
                 File parentDir = selectedFiles.get(0).getParentFile();
                 File corruptedDir = new File(parentDir, "corrupted");
                 if (!corruptedDir.exists()) corruptedDir.mkdirs();
 
-                List<File> corruptedFiles = new ArrayList<>();
-
-                int phase1Total = selectedFiles.size();
+            /* =========================
+               1️⃣ PHASE CONVERSION
+               ========================= */
+                int totalConvert = selectedFiles.size();
                 int processed = 0;
 
-                // ======================
-                // PHASE 1 – CONVERSION
-                // ======================
+                updateMessage("Converting files…");
+                updateProgress(0, totalConvert);
+
                 for (File file : selectedFiles) {
-                    boolean success = changeSingleFileExtension(file, normalizedExtension, corruptedDir);
-                    if (!success) {
-                        corruptedFiles.add(new File(corruptedDir, file.getName()));
-                    }
-                    updateProgress(++processed, phase1Total + corruptedFiles.size());
+
+                    if (isCancelled()) return null;
+
+                    changeSingleFileExtension(
+                            file,
+                            normalizedExtension,
+                            corruptedDir
+                    );
+
+                    processed++;
+                    updateProgress(processed, totalConvert);
+                    updateMessage(
+                            "Converted " + processed + " / " + totalConvert
+                    );
                 }
 
-                // ======================
-                // PHASE 2 – RÉPARATION
-                // ======================
-                if (!corruptedFiles.isEmpty()) {
-                    int repairCount = 0;
-                    // CorruptedRepairService repairService = new CorruptedRepairService();
+            /* =========================
+               2️⃣ PHASE RÉPARATION
+               ========================= */
+                File[] corruptedFiles = corruptedDir.listFiles();
+                if (corruptedFiles != null && corruptedFiles.length > 0) {
+
+                    int totalRepair = corruptedFiles.length;
+                    int repaired = 0;
+
+                    updateMessage("Repairing corrupted images…");
+                    updateProgress(0, totalRepair);
+
                     for (File corrupted : corruptedFiles) {
-                        new CorruptedRepairService().repairCorruptedFolder(corruptedDir);// 🐍 Python / Magick
-                        updateProgress(++processed, phase1Total + corruptedFiles.size());
+
+                        if (isCancelled()) return null;
+
+                        corruptedRepairService
+                                .repairFileWithFallbacks(corrupted, null);
+
+                        repaired++;
+                        updateProgress(repaired, totalRepair);
+                        updateMessage(
+                                "Repaired " + repaired + " / " + totalRepair
+                        );
                     }
                 }
 
+                updateMessage("All operations completed ✔");
+                updateProgress(1, 1);
                 return null;
             }
         };
 
-        task.setOnSucceeded(e -> {
-            progressBar.progressProperty().unbind();
-            progressBar.setProgress(1);
+    /* =========================
+       UI BINDINGS
+       ========================= */
+        progressBar.progressProperty().bind(task.progressProperty());
 
+        task.setOnSucceeded(e -> {
+            progressBar.setVisible(false);
             messageService.showMessage(
                     Alert.AlertType.INFORMATION,
-                    "Process completed",
-                    "All files have been processed.\nCorrupted images were handled if possible."
+                    "Completed",
+                    "Conversion and repair finished successfully."
             );
         });
 
         task.setOnFailed(e -> {
-            progressBar.progressProperty().unbind();
+            progressBar.setVisible(false);
             messageService.showMessage(
                     Alert.AlertType.ERROR,
-                    "Process failed",
-                    "An unexpected error occurred during processing."
+                    "Error",
+                    "An error occurred during processing."
             );
         });
 
-        progressBar.progressProperty().bind(task.progressProperty());
         new Thread(task, "file-extension-task").start();
     }
 
@@ -398,4 +444,5 @@ public class FileExtensionService {
         int dot = name.lastIndexOf('.');
         return dot == -1 ? name : name.substring(0, dot);
     }
+
 }

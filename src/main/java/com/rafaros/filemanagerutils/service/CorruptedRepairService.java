@@ -198,6 +198,10 @@ public class CorruptedRepairService {
             return false;
         }
 
+       if (scriptFile==null){
+          scriptFile=this.pythonRepairScript;
+       }
+
         try {
             ProcessBuilder pb = new ProcessBuilder(
                     "python",

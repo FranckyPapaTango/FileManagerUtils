@@ -55,6 +55,7 @@ public class FileManagerController {
 
     @FXML
     private void handleSelectFiles() {
+        progressBar.progressProperty().unbind();
         selectedFiles.clear();
         selectedDirectory = null;
         selectedFilesInfo.clear();
@@ -75,7 +76,7 @@ public class FileManagerController {
 
     @FXML
     private void handleSelectDirectory() {
-
+        progressBar.progressProperty().unbind();
         DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select Folder");
         File dir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
