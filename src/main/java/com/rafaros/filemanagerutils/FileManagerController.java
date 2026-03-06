@@ -26,6 +26,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.commons.imaging.Imaging;
@@ -475,10 +479,40 @@ public class FileManagerController {
 
     @FXML
     private void handleMergeSubfolders() {
+
         if (distributionRootFolder == null) {
             distributionStatusLabel.setText("Status: No folder selected");
             return;
         }
+
+        CheckBox reductionCheckBox = new CheckBox("Merge With Reduction");
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Merge Options");
+        alert.setHeaderText("Choose merge behaviour");
+
+        VBox content = new VBox(10);
+        content.getChildren().add(reductionCheckBox);
+
+        alert.getDialogPane().setContent(content);
+
+        Optional<ButtonType> result = alert.showAndWait();
+
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return;
+        }
+
+        boolean mergeWithReduction = reductionCheckBox.isSelected();
+
+        if (mergeWithReduction) {
+            startMergeTask(true);
+        } else {
+            startMergeTask(false);
+        }
+    }
+
+/*
+    private void startMergeTask(boolean withReduction) {
 
         File[] subDirs = distributionRootFolder.listFiles(File::isDirectory);
         if (subDirs == null || subDirs.length == 0) {
@@ -490,36 +524,59 @@ public class FileManagerController {
         distributionStatusLabel.setText("Status: Merging...");
 
         Task<Void> task = new Task<>() {
+
             @Override
             protected Void call() throws Exception {
-                List<Path> movedFiles = new ArrayList<>();
+
                 int totalFiles = Arrays.stream(subDirs)
                         .mapToInt(d -> Objects.requireNonNull(d.listFiles(File::isFile)).length)
                         .sum();
+
                 int processed = 0;
 
                 for (File dir : subDirs) {
+
                     File[] filesInDir = dir.listFiles(File::isFile);
                     if (filesInDir == null) continue;
+
                     for (File file : filesInDir) {
-                        Files.move(file.toPath(), distributionRootFolder.toPath().resolve(file.getName()), StandardCopyOption.REPLACE_EXISTING);
-                        movedFiles.add(file.toPath());
+
+                        Path target = distributionRootFolder.toPath().resolve(file.getName());
+
+                        Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+
                         processed++;
                         updateProgress(processed, totalFiles);
                     }
+
                     File[] remaining = dir.listFiles();
-                    if (remaining == null || remaining.length == 0) Files.deleteIfExists(dir.toPath());
+
+                    if (remaining == null || remaining.length == 0) {
+                        Files.deleteIfExists(dir.toPath());
+                    }
                 }
+
+                if (withReduction) {
+                    reduceFolders();
+                }
+
                 return null;
             }
         };
 
         distributionProgressBar.progressProperty().bind(task.progressProperty());
+
         task.setOnSucceeded(e -> {
             distributionProgressBar.progressProperty().unbind();
             distributionProgressBar.setProgress(1);
-            distributionStatusLabel.setText("Status: Merge completed");
+
+            if (withReduction) {
+                distributionStatusLabel.setText("Status: Merge + Reduction completed");
+            } else {
+                distributionStatusLabel.setText("Status: Merge completed");
+            }
         });
+
         task.setOnFailed(e -> {
             distributionProgressBar.progressProperty().unbind();
             distributionProgressBar.setProgress(0);
@@ -527,5 +584,192 @@ public class FileManagerController {
         });
 
         new Thread(task).start();
+    }
+*/
+
+    private void startMergeTask(boolean withReduction) {
+
+        File[] subDirs = distributionRootFolder.listFiles(File::isDirectory);
+        if (subDirs == null || subDirs.length == 0) {
+            distributionStatusLabel.setText("Status: No subfolders to merge");
+            return;
+        }
+
+        distributionProgressBar.setProgress(0);
+        distributionStatusLabel.setText("Status: Merging (multi-thread)...");
+
+        Task<Void> task = new Task<>() {
+
+            @Override
+            protected Void call() throws Exception {
+
+                List<Path> filesToMove = new ArrayList<>();
+
+                for (File dir : subDirs) {
+                    File[] files = dir.listFiles(File::isFile);
+                    if (files != null) {
+                        for (File f : files) {
+                            filesToMove.add(f.toPath());
+                        }
+                    }
+                }
+
+                int totalFiles = filesToMove.size();
+                AtomicInteger processed = new AtomicInteger();
+
+                int threads = Runtime.getRuntime().availableProcessors();
+                ExecutorService executor = Executors.newFixedThreadPool(threads);
+
+                for (Path source : filesToMove) {
+
+                    executor.submit(() -> {
+
+                        try {
+
+                            Path target = distributionRootFolder.toPath().resolve(source.getFileName());
+
+                            synchronized (distributionRootFolder) {
+                                if (Files.exists(target)) {
+
+                                    String base = source.getFileName().toString();
+                                    int counter = 1;
+                                    Path newTarget;
+
+                                    do {
+                                        newTarget = distributionRootFolder.toPath()
+                                                .resolve(counter + "_" + base);
+                                        counter++;
+                                    } while (Files.exists(newTarget));
+
+                                    target = newTarget;
+                                }
+                            }
+
+                            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+
+                        } catch (Exception ignored) {
+                        }
+
+                        int done = processed.incrementAndGet();
+                        updateProgress(done, totalFiles);
+
+                    });
+                }
+
+                executor.shutdown();
+                executor.awaitTermination(1, TimeUnit.HOURS);
+
+                for (File dir : subDirs) {
+                    File[] remaining = dir.listFiles();
+                    if (remaining == null || remaining.length == 0) {
+                        Files.deleteIfExists(dir.toPath());
+                    }
+                }
+
+                if (withReduction) {
+                    reduceFolders();
+                }
+
+                return null;
+            }
+        };
+
+        distributionProgressBar.progressProperty().bind(task.progressProperty());
+
+        task.setOnSucceeded(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(1);
+            distributionStatusLabel.setText("Status: Merge completed (ultra fast)");
+        });
+
+        task.setOnFailed(e -> {
+            distributionProgressBar.progressProperty().unbind();
+            distributionProgressBar.setProgress(0);
+            distributionStatusLabel.setText("Status: Error during merge");
+        });
+
+        new Thread(task).start();
+    }
+
+
+    private void reduceFolders() throws Exception {
+
+        File[] parentDirs = distributionRootFolder.listFiles(File::isDirectory);
+        if (parentDirs == null) return;
+
+        int threads = Runtime.getRuntime().availableProcessors();
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+
+        List<Path> foldersToProcess = new ArrayList<>();
+
+        for (File dir : parentDirs) {
+
+            File[] children = dir.listFiles(File::isDirectory);
+
+            if (children != null) {
+                for (File child : children) {
+                    foldersToProcess.add(child.toPath());
+                }
+            }
+        }
+
+        for (Path sourceFolder : foldersToProcess) {
+
+            executor.submit(() -> {
+
+                try {
+
+                    Path targetFolder =
+                            distributionRootFolder.toPath()
+                                    .resolve(sourceFolder.getFileName());
+
+                    Files.createDirectories(targetFolder);
+
+                    try (DirectoryStream<Path> stream =
+                                 Files.newDirectoryStream(sourceFolder)) {
+
+                        for (Path file : stream) {
+
+                            Path target = targetFolder.resolve(file.getFileName());
+
+                            if (Files.exists(target)) {
+
+                                String base = file.getFileName().toString();
+                                int counter = 1;
+                                Path newTarget;
+
+                                do {
+                                    newTarget = targetFolder.resolve(counter + "_" + base);
+                                    counter++;
+                                } while (Files.exists(newTarget));
+
+                                target = newTarget;
+                            }
+
+                            Files.move(file, target, StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+
+                    Files.deleteIfExists(sourceFolder);
+
+                } catch (Exception ignored) {
+                }
+
+            });
+
+        }
+
+        executor.shutdown();
+        executor.awaitTermination(1, TimeUnit.HOURS);
+
+        // suppression des dossiers parents devenus vides
+        for (File dir : parentDirs) {
+
+            File[] remaining = dir.listFiles();
+
+            if (remaining == null || remaining.length == 0) {
+                Files.deleteIfExists(dir.toPath());
+            }
+        }
     }
 }
