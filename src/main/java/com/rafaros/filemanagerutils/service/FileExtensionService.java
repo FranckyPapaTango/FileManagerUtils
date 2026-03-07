@@ -392,11 +392,23 @@ public class FileExtensionService {
         );
         if (!confirmed) return containerDirectory;
 
-        renameFilesRecursively(selectedDirectory, gatherInContainer, containerDirectory);
+        // renameFilesRecursively(selectedDirectory, gatherInContainer, containerDirectory);
+        File[] parentFolders = selectedDirectory.listFiles(File::isDirectory);
+
+        if (parentFolders == null || parentFolders.length == 0) {
+            messageService.showMessage(Alert.AlertType.WARNING,
+                    "No folders",
+                    "Selected directory contains no subfolders.");
+            return containerDirectory;
+        }
+
+        for (File parent : parentFolders) {
+            renameFilesRecursively(parent, gatherInContainer, containerDirectory);
+        }
         return containerDirectory;
     }
 
-    private void renameFilesRecursively(File directory, boolean gatherInContainer, File containerDirectory) {
+    public void renameFilesRecursively(File directory, boolean gatherInContainer, File containerDirectory) {
         File[] files = directory.listFiles();
         if (files == null) return;
 
@@ -418,7 +430,7 @@ public class FileExtensionService {
         }
     }
 
-    private Path getAvailablePath(Path folder, String filename) {
+    public Path getAvailablePath(Path folder, String filename) {
         Path target = folder.resolve(filename);
         int count = 1;
         String name = filename.contains(".") ? filename.substring(0, filename.lastIndexOf('.')) : filename;

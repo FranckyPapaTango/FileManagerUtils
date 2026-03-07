@@ -26,11 +26,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.imaging.Imaging;
 import org.apache.commons.imaging.ImageReadException;
@@ -40,6 +42,7 @@ public class FileManagerController {
     private final StrateMovingService strateMovingService = new StrateMovingService();
     private final MessageService messageService = new MessageService();
     private final FileExtensionService fileExtensionService = new FileExtensionService();
+
 
     private List<File> selectedFiles = new ArrayList<>();
     private File selectedDirectory;
@@ -78,44 +81,7 @@ public class FileManagerController {
     }
 
 
-    @FXML
-    private void handleSelectDirectory() {
-        progressBar.progressProperty().unbind();
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Folder");
-        File dir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
 
-        if (dir == null) {
-            return;
-        }
-
-        selectedFiles.clear();
-        selectedDirectory = dir;
-
-        File[] files = dir.listFiles((d, name) -> {
-            String lower = name.toLowerCase();
-            return lower.endsWith(".png")
-                    || lower.endsWith(".jpg")
-                    || lower.endsWith(".jpeg");
-        });
-
-        if (files == null || files.length == 0) {
-            messageService.showMessage(
-                    Alert.AlertType.INFORMATION,
-                    "No images",
-                    "No image files found in selected folder."
-            );
-            return;
-        }
-
-        selectedFiles.addAll(Arrays.asList(files));
-
-        progressBar.progressProperty().unbind();
-        progressBar.setProgress(0);
-        progressBar.setVisible(false);
-
-        updateSelectedFilesInfo();
-    }
 
     /**
      * Méthode robuste de conversion PNG -> JPG
@@ -166,20 +132,6 @@ public class FileManagerController {
         fileExtensionService.handleProceed(selectedFiles, extensionField, progressBar);
     }
 
-    @FXML
-    private void handleRenameContent() {
-        containerDirectory = null; // reset volontaire
-        if (gatherInContainerCheckbox.isSelected()) {
-            containerDirectory = fileExtensionService.handleRenameContent(selectedDirectory, true, containerNameField.getText());
-        } else {
-            fileExtensionService.handleRenameContent(selectedDirectory, false, null);
-        }
-    }
-
-    @FXML
-    private void handleGatherInContainer() {
-        containerNameField.setVisible(gatherInContainerCheckbox.isSelected());
-    }
 
     /* ================================== */
     /*         REPAIR CORRUPTED IMAGES   */
@@ -383,6 +335,263 @@ public class FileManagerController {
         boolean active = recycleBinToggle.isSelected();
         exportRecycleBinButton.setDisable(!active);
         recycleBinToggle.setText(active ? "RecycleBin On" : "RecycleBin Off");
+    }
+
+    /* ================================== */
+    /*         RENAME BY FOLDERNAME       */
+    /* ================================== */
+
+    @FXML private ProgressBar progressBar2;
+    @FXML public Label renameStatusLabel;
+
+
+    /* ---------- EXTENSION RAPIDE ---------- */
+
+    private String getExtension(File file) {
+        String name = file.getName();
+        int dot = name.lastIndexOf('.');
+        return dot == -1 ? "" : name.substring(dot);
+    }
+
+
+    /* ---------- SELECT DIRECTORY ---------- */
+
+    @FXML
+    private void handleSelectDirectory() {
+
+        progressBar2.progressProperty().unbind();
+        renameStatusLabel.textProperty().unbind();
+
+        progressBar2.setProgress(0);
+        progressBar2.setVisible(false);
+
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Folder");
+
+        File dir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
+
+        if (dir == null) {
+            return;
+        }
+
+        selectedFiles.clear();
+        selectedDirectory = dir;
+
+        List<File> images = new ArrayList<>();
+
+        File[] subDirs = dir.listFiles(File::isDirectory);
+
+        if (subDirs != null) {
+            for (File sub : subDirs) {
+
+                File[] files = sub.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".png")
+                            || lower.endsWith(".jpg")
+                            || lower.endsWith(".jpeg");
+                });
+
+                if (files != null) {
+                    images.addAll(Arrays.asList(files));
+                }
+            }
+        }
+
+        if (images.isEmpty()) {
+
+            messageService.showMessage(
+                    Alert.AlertType.INFORMATION,
+                    "No images",
+                    "No image files found in subfolders."
+            );
+
+            return;
+        }
+
+        selectedFiles.addAll(images);
+
+        progressBar2.progressProperty().unbind();
+        progressBar2.setProgress(0);
+        progressBar2.setVisible(false);
+
+        updateSelectedFilesInfo();
+    }
+
+
+    /* ---------- RENAME CONTENT ---------- */
+
+    @FXML
+    private void handleRenameContent() {
+
+        if (selectedDirectory == null) {
+
+            messageService.showMessage(
+                    Alert.AlertType.WARNING,
+                    "No folder",
+                    "Please select a directory first."
+            );
+
+            return;
+        }
+
+        /* IMPORTANT : enlever les anciens bindings */
+        progressBar2.progressProperty().unbind();
+        renameStatusLabel.textProperty().unbind();
+
+        progressBar2.setProgress(0);
+        progressBar2.setVisible(true);
+
+        Task<Void> task = new Task<>() {
+
+            @Override
+            protected Void call() throws Exception {
+
+                List<File> allImages = new ArrayList<>();
+
+                /* ---------- SCAN ---------- */
+
+                try (Stream<Path> stream = Files.walk(selectedDirectory.toPath())) {
+
+                    stream.filter(Files::isRegularFile)
+                            .map(Path::toFile)
+                            .filter(f -> {
+
+                                String n = f.getName().toLowerCase();
+
+                                return n.endsWith(".jpg")
+                                        || n.endsWith(".jpeg")
+                                        || n.endsWith(".png");
+                            })
+                            .forEach(allImages::add);
+                }
+
+                int total = allImages.size();
+
+                if (total == 0) {
+                    updateMessage("No images found");
+                    return null;
+                }
+
+                updateMessage("Found " + total + " images");
+
+                /* ---------- GROUPE PAR DOSSIER ---------- */
+
+                Map<Path, List<File>> filesByFolder = new HashMap<>();
+
+                for (File file : allImages) {
+
+                    Path parent = file.getParentFile().toPath();
+
+                    filesByFolder
+                            .computeIfAbsent(parent, k -> new ArrayList<>())
+                            .add(file);
+                }
+
+                AtomicInteger processed = new AtomicInteger(0);
+
+                /* ---------- CONTAINER ---------- */
+
+                File containerDirectory = null;
+
+                if (gatherInContainerCheckbox.isSelected()) {
+
+                    containerDirectory = new File(
+                            selectedDirectory,
+                            containerNameField.getText()
+                    );
+
+                    containerDirectory.mkdirs();
+                }
+
+                File finalContainerDirectory = containerDirectory;
+
+                /* ---------- TRAITEMENT PAR DOSSIER ---------- */
+
+                filesByFolder.entrySet().parallelStream().forEach(entry -> {
+
+                    Path folder = entry.getKey();
+                    List<File> files = entry.getValue();
+
+                    String baseName = folder.getFileName().toString();
+
+                    List<Path> tempFiles = new ArrayList<>();
+                    Map<Path, String> extensions = new HashMap<>();
+
+                    /* ---------- PASS 1 : TEMP RENAME ---------- */
+
+                    for (File file : files) {
+
+                        try {
+
+                            String ext = getExtension(file);
+
+                            Path temp = file.toPath().resolveSibling(
+                                    "temp_" + UUID.randomUUID()
+                            );
+
+                            Files.move(file.toPath(), temp);
+
+                            tempFiles.add(temp);
+                            extensions.put(temp, ext);
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    int index = 1;
+
+                    /* ---------- PASS 2 : FINAL RENAME ---------- */
+
+                    for (Path temp : tempFiles) {
+
+                        try {
+
+                            String ext = extensions.get(temp);
+
+                            Path targetFolder = gatherInContainerCheckbox.isSelected()
+                                    ? finalContainerDirectory.toPath()
+                                    : folder;
+
+                            Path target = targetFolder.resolve(
+                                    baseName + "_" + index + ext
+                            );
+
+                            Files.move(temp, target);
+
+                            index++;
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
+                        int done = processed.incrementAndGet();
+
+                        updateProgress(done, total);
+
+                        updateMessage("Processed " + done + " / " + total);
+                    }
+
+                });
+
+                updateMessage("Completed ✔");
+
+                return null;
+            }
+        };
+
+        progressBar2.progressProperty().bind(task.progressProperty());
+        renameStatusLabel.textProperty().bind(task.messageProperty());
+
+        new Thread(task, "rename-task").start();
+    }
+
+
+    /* ---------- CHECKBOX ---------- */
+
+    @FXML
+    private void handleGatherInContainer() {
+        containerNameField.setVisible(gatherInContainerCheckbox.isSelected());
     }
 
     /* ================================== */

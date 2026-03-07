@@ -228,8 +228,7 @@
                     <ProgressBar fx:id="exportProgressBar"
                                  prefWidth="510"
                                  progress="0.0"
-                                 visible="false"
-                                 managed="true"/>
+                                 visible="false"/>
 
                     <Button fx:id="cleanFoldersButton"
                             text="Clean Folders Name"
@@ -271,6 +270,14 @@
                     <TextField fx:id="containerNameField"
                                promptText="Conteneur Final"
                                visible="false"/>
+
+                    <!-- 👇 Progress bar -->
+                    <Label fx:id="renameStatusLabel" text="Status: Waiting"/>
+                    <ProgressBar fx:id="progressBar2"
+                                 prefWidth="510"
+                                 progress="0.0"
+                                 visible="false"/>
+
                 </VBox>
             </AnchorPane>
         </StackPane>
