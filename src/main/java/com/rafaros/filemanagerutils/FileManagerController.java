@@ -61,6 +61,39 @@ public class FileManagerController {
     @FXML private TextField containerNameField;
 
     @FXML
+    private void handleSelectFolder() {
+
+        progressBar.progressProperty().unbind();
+        selectedFiles.clear();
+        selectedDirectory = null;
+        selectedFilesInfo.clear();
+        progressBar.setProgress(0);
+        progressBar.setVisible(false);
+
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Folder");
+
+        File folder = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
+
+        if (folder != null && folder.isDirectory()) {
+
+            selectedDirectory = folder;
+
+            File[] files = folder.listFiles();
+
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile()) {   // évite les sous-dossiers
+                        selectedFiles.add(file);
+                    }
+                }
+            }
+        }
+
+        updateSelectedFilesInfo();
+    }
+
+    @FXML
     private void handleSelectFiles() {
         progressBar.progressProperty().unbind();
         selectedFiles.clear();
@@ -79,8 +112,6 @@ public class FileManagerController {
         }
         updateSelectedFilesInfo();
     }
-
-
 
 
     /**

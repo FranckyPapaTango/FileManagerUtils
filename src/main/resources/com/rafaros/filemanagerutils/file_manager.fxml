@@ -113,7 +113,7 @@
 
                     <HBox spacing="10" alignment="CENTER">
                         <Button text="Select Files" onAction="#handleSelectFiles"/>
-                        <Button text="Select Folder" onAction="#handleSelectDirectory"/>
+                        <Button text="Select Folder" onAction="#handleSelectFolder"/>
                     </HBox>
 
                     <HBox alignment="CENTER">
