@@ -27,66 +27,135 @@ public class FileExtensionService {
        EXTENSION / CONVERSION SÉCURISÉE
        ========================================================= */
     public boolean changeSingleFileExtension(File file, String newExtension, File corruptedDir) {
+
         if (file == null || !file.exists() || newExtension == null || newExtension.isEmpty()) {
             return false;
         }
 
         newExtension = newExtension.replaceFirst("^\\.", "").toLowerCase();
+
         String srcExt = getFileExtension(file).toLowerCase();
+        String baseName = getFileNameWithoutExtension(file);
+
         File parentDir = file.getParentFile();
-        File outputFile = new File(parentDir, getFileNameWithoutExtension(file) + "." + newExtension);
+
+        boolean sameExtension = srcExt.equals("." + newExtension);
+
+        File outputFile = sameExtension
+                ? new File(parentDir, baseName + "_converted." + newExtension)
+                : new File(parentDir, baseName + "." + newExtension);
 
         try {
-            // --- PNG → JPG ---
+
+        /* =========================================
+           PNG → JPG
+           ========================================= */
+
             if (srcExt.equals(".png") && newExtension.equals("jpg")) {
+
                 boolean converted = false;
 
-                try { convertToJpg(file); converted = true; } catch (IOException ignored) {}
+                try {
+                    convertToJpg(file);
+                    converted = true;
+                } catch (IOException ignored) {}
 
                 if (!converted) {
-                    File tempFile = new File(parentDir, getFileNameWithoutExtension(file) + "_repaired.png");
+
+                    File tempFile = new File(parentDir, baseName + "_repaired.png");
+
                     if (repairImageWithMagick(file, tempFile)) {
-                        try { convertToJpg(tempFile); converted = true; } catch (IOException ignored) {}
+                        try {
+                            convertToJpg(tempFile);
+                            converted = true;
+                        } catch (IOException ignored) {}
                     }
+
                     tempFile.delete();
                 }
 
-                if (converted) { Files.deleteIfExists(file.toPath()); return true; }
+                if (converted) {
+                    Files.deleteIfExists(file.toPath());
+                    return true;
+                }
+
                 throw new IOException("PNG → JPG conversion failed after repair attempts");
             }
 
-            // --- HEIC / JPEG / JPG ---
-            boolean isHeic = isActuallyHeic(file) || srcExt.equals(".heic") || srcExt.equals(".jpg") || srcExt.equals(".jpeg");
+        /* =========================================
+           HEIC / JPEG / JPG conversion
+           ========================================= */
+
+            boolean isHeic = isActuallyHeic(file)
+                    || srcExt.equals(".heic")
+                    || srcExt.equals(".jpg")
+                    || srcExt.equals(".jpeg");
+
             if (isHeic) {
-                boolean success = convertWithImageMagick(file, outputFile) || convertWithHeifDec(file, outputFile);
-                if (success) { Files.deleteIfExists(file.toPath()); return true; }
+
+                boolean success =
+                        convertWithImageMagick(file, outputFile)
+                                || convertWithHeifDec(file, outputFile);
+
+                if (success) {
+
+                    if (sameExtension) {
+                        Files.deleteIfExists(file.toPath());
+                        Files.move(outputFile.toPath(), file.toPath(),
+                                StandardCopyOption.REPLACE_EXISTING);
+                    } else {
+                        Files.deleteIfExists(file.toPath());
+                    }
+
+                    return true;
+                }
+
                 throw new IOException("HEIC/IM conversion failed");
             }
 
-            // --- AUTRES: simple renommage ---
+        /* =========================================
+           AUTRES : simple renommage
+           ========================================= */
+
             if (!file.toPath().equals(outputFile.toPath())) {
-                Files.move(file.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.move(file.toPath(), outputFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING);
             }
+
             return true;
 
         } catch (Exception e) {
-            System.err.println("Conversion failed: " + file.getName() + " (" + e.getMessage() + ")");
-            // 📁 Déplace dans corrupted/
+
+            System.err.println("Conversion failed: "
+                    + file.getName() + " (" + e.getMessage() + ")");
+
             try {
+
                 Path target = corruptedDir.toPath().resolve(file.getName());
+
                 int count = 1;
-                String name = getFileNameWithoutExtension(file);
+                String name = baseName;
                 String ext = getFileExtension(file);
+
                 while (Files.exists(target)) {
                     target = corruptedDir.toPath().resolve(name + "_" + count + ext);
                     count++;
                 }
+
                 Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+
                 System.err.println("Moved to corrupted/: " + target.getFileName());
+
             } catch (IOException moveEx) {
-                System.err.println("Failed to move corrupted file: " + file.getName() + " (" + moveEx.getMessage() + ")");
+
+                System.err.println("Failed to move corrupted file: "
+                        + file.getName() + " (" + moveEx.getMessage() + ")");
             }
-            try { Files.deleteIfExists(outputFile.toPath()); } catch (IOException ignored) {}
+
+            try {
+                Files.deleteIfExists(outputFile.toPath());
+            } catch (IOException ignored) {}
+
             return false;
         }
     }
@@ -118,13 +187,16 @@ public class FileExtensionService {
        CONVERSIONS
        ========================================================= */
     private boolean convertWithImageMagick(File inputFile, File outputFile) {
+
         try {
+
             ProcessBuilder pb = new ProcessBuilder(
                     "magick",
                     inputFile.getAbsolutePath(),
                     "-auto-orient",
                     "-colorspace", "sRGB",
                     "-depth", "8",
+                    "-type", "TrueColor",
                     "-alpha", "remove",
                     "-sampling-factor", "4:2:0",
                     "-strip",
@@ -132,17 +204,24 @@ public class FileExtensionService {
                     "-quality", "80",
                     outputFile.getAbsolutePath()
             );
+
             pb.redirectErrorStream(true);
+
             Process process = pb.start();
 
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            try (BufferedReader reader =
+                         new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+
                 String line;
+
                 while ((line = reader.readLine()) != null) {
-                    System.out.println(line); // logging des erreurs / warnings
+                    System.out.println(line);
                 }
             }
 
-            return process.waitFor() == 0;
+            int exit = process.waitFor();
+
+            return exit == 0 && outputFile.exists();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -151,16 +230,23 @@ public class FileExtensionService {
     }
 
     private boolean convertWithHeifDec(File inputFile, File outputFile) {
+
         try {
+
             ProcessBuilder pb = new ProcessBuilder(
                     "heif-dec.exe",
                     inputFile.getAbsolutePath(),
                     outputFile.getAbsolutePath()
             );
+
             pb.redirectErrorStream(true);
+
             Process process = pb.start();
-            process.waitFor();
-            return process.exitValue() == 0;
+
+            int exit = process.waitFor();
+
+            return exit == 0 && outputFile.exists();
+
         } catch (Exception e) {
             e.printStackTrace();
             return false;
