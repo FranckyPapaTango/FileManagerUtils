@@ -374,14 +374,94 @@ public class FileManagerController {
 
     @FXML private ProgressBar progressBar2;
     @FXML public Label renameStatusLabel;
+    @FXML private TextField selectedDirectoryField;
+    @FXML private CheckBox reduceSubfoldersCheckbox;
 
 
     /* ---------- EXTENSION RAPIDE ---------- */
 
     private String getExtension(File file) {
+
         String name = file.getName();
+
         int dot = name.lastIndexOf('.');
+
         return dot == -1 ? "" : name.substring(dot);
+    }
+
+
+    /* ---------- REDUCE SUBFOLDERS ---------- */
+
+    private void reduceSubfolders(File rootFolder) {
+
+        File[] firstLevelFolders = rootFolder.listFiles(File::isDirectory);
+
+        if (firstLevelFolders == null) {
+            return;
+        }
+
+        for (File parentFolder : firstLevelFolders) {
+
+            try (Stream<Path> stream =
+                         Files.walk(parentFolder.toPath())) {
+
+                List<Path> files = stream
+                        .filter(Files::isRegularFile)
+                        .collect(Collectors.toList());
+
+                for (Path source : files) {
+
+                    File sourceFile = source.toFile();
+
+                    // ignorer fichiers déjà dans parentFolder
+                    if (sourceFile.getParentFile().equals(parentFolder)) {
+                        continue;
+                    }
+
+                    String fileName = sourceFile.getName();
+
+                    Path target =
+                            parentFolder.toPath().resolve(fileName);
+
+                    /* ---------- COLLISION ---------- */
+
+                    if (Files.exists(target)) {
+
+                        String ext = getExtension(sourceFile);
+
+                        String baseName =
+                                fileName.substring(
+                                        0,
+                                        fileName.length() - ext.length()
+                                );
+
+                        int index = 1;
+
+                        while (Files.exists(target)) {
+
+                            target =
+                                    parentFolder.toPath().resolve(
+                                            baseName
+                                                    + "_"
+                                                    + index
+                                                    + ext
+                                    );
+
+                            index++;
+                        }
+                    }
+
+                    Files.move(
+                            source,
+                            target,
+                            StandardCopyOption.REPLACE_EXISTING
+                    );
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
 
@@ -396,36 +476,42 @@ public class FileManagerController {
         progressBar2.setProgress(0);
         progressBar2.setVisible(false);
 
+        renameStatusLabel.setText("Status: Waiting");
+
         DirectoryChooser directoryChooser = new DirectoryChooser();
+
         directoryChooser.setTitle("Select Folder");
 
-        File dir = directoryChooser.showDialog(selectedFilesInfo.getScene().getWindow());
+        File dir = directoryChooser.showDialog(
+                selectedFilesInfo.getScene().getWindow()
+        );
 
         if (dir == null) {
             return;
         }
 
         selectedFiles.clear();
+
         selectedDirectory = dir;
 
         List<File> images = new ArrayList<>();
 
-        File[] subDirs = dir.listFiles(File::isDirectory);
+        try (Stream<Path> stream = Files.walk(dir.toPath())) {
 
-        if (subDirs != null) {
-            for (File sub : subDirs) {
+            stream.filter(Files::isRegularFile)
+                    .map(Path::toFile)
+                    .filter(f -> {
 
-                File[] files = sub.listFiles((d, name) -> {
-                    String lower = name.toLowerCase();
-                    return lower.endsWith(".png")
-                            || lower.endsWith(".jpg")
-                            || lower.endsWith(".jpeg");
-                });
+                        String lower = f.getName().toLowerCase();
 
-                if (files != null) {
-                    images.addAll(Arrays.asList(files));
-                }
-            }
+                        return lower.endsWith(".png")
+                                || lower.endsWith(".jpg")
+                                || lower.endsWith(".jpeg");
+                    })
+                    .forEach(images::add);
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         if (images.isEmpty()) {
@@ -433,7 +519,7 @@ public class FileManagerController {
             messageService.showMessage(
                     Alert.AlertType.INFORMATION,
                     "No images",
-                    "No image files found in subfolders."
+                    "No image files found."
             );
 
             return;
@@ -442,8 +528,18 @@ public class FileManagerController {
         selectedFiles.addAll(images);
 
         progressBar2.progressProperty().unbind();
+
         progressBar2.setProgress(0);
+
         progressBar2.setVisible(false);
+
+        selectedDirectoryField.setText(
+                selectedDirectory.getAbsolutePath()
+        );
+
+        renameStatusLabel.setText(
+                "Found " + images.size() + " images"
+        );
 
         updateSelectedFilesInfo();
     }
@@ -465,11 +561,11 @@ public class FileManagerController {
             return;
         }
 
-        /* IMPORTANT : enlever les anciens bindings */
         progressBar2.progressProperty().unbind();
         renameStatusLabel.textProperty().unbind();
 
         progressBar2.setProgress(0);
+
         progressBar2.setVisible(true);
 
         Task<Void> task = new Task<>() {
@@ -477,17 +573,30 @@ public class FileManagerController {
             @Override
             protected Void call() throws Exception {
 
+                /* ---------- REDUCE SUBFOLDERS ---------- */
+
+                if (reduceSubfoldersCheckbox.isSelected()) {
+
+                    updateMessage("Reducing subfolders...");
+
+                    reduceSubfolders(selectedDirectory);
+
+                    deleteEmptySubfolders(selectedDirectory);
+                }
+
                 List<File> allImages = new ArrayList<>();
 
                 /* ---------- SCAN ---------- */
 
-                try (Stream<Path> stream = Files.walk(selectedDirectory.toPath())) {
+                try (Stream<Path> stream =
+                             Files.walk(selectedDirectory.toPath())) {
 
                     stream.filter(Files::isRegularFile)
                             .map(Path::toFile)
                             .filter(f -> {
 
-                                String n = f.getName().toLowerCase();
+                                String n =
+                                        f.getName().toLowerCase();
 
                                 return n.endsWith(".jpg")
                                         || n.endsWith(".jpeg")
@@ -499,7 +608,9 @@ public class FileManagerController {
                 int total = allImages.size();
 
                 if (total == 0) {
+
                     updateMessage("No images found");
+
                     return null;
                 }
 
@@ -507,18 +618,24 @@ public class FileManagerController {
 
                 /* ---------- GROUPE PAR DOSSIER ---------- */
 
-                Map<Path, List<File>> filesByFolder = new HashMap<>();
+                Map<Path, List<File>> filesByFolder =
+                        new HashMap<>();
 
                 for (File file : allImages) {
 
-                    Path parent = file.getParentFile().toPath();
+                    Path parent =
+                            file.getParentFile().toPath();
 
                     filesByFolder
-                            .computeIfAbsent(parent, k -> new ArrayList<>())
+                            .computeIfAbsent(
+                                    parent,
+                                    k -> new ArrayList<>()
+                            )
                             .add(file);
                 }
 
-                AtomicInteger processed = new AtomicInteger(0);
+                AtomicInteger processed =
+                        new AtomicInteger(0);
 
                 /* ---------- CONTAINER ---------- */
 
@@ -526,84 +643,135 @@ public class FileManagerController {
 
                 if (gatherInContainerCheckbox.isSelected()) {
 
+                    String containerName =
+                            containerNameField.getText().trim();
+
+                    if (containerName.isEmpty()) {
+
+                        containerName = "FINAL_CONTAINER";
+                    }
+
                     containerDirectory = new File(
                             selectedDirectory,
-                            containerNameField.getText()
+                            containerName
                     );
 
                     containerDirectory.mkdirs();
                 }
 
-                File finalContainerDirectory = containerDirectory;
+                File finalContainerDirectory =
+                        containerDirectory;
 
                 /* ---------- TRAITEMENT PAR DOSSIER ---------- */
 
-                filesByFolder.entrySet().parallelStream().forEach(entry -> {
+                filesByFolder.entrySet()
+                        .parallelStream()
+                        .forEach(entry -> {
 
-                    Path folder = entry.getKey();
-                    List<File> files = entry.getValue();
+                            Path folder = entry.getKey();
 
-                    String baseName = folder.getFileName().toString();
+                            List<File> files =
+                                    entry.getValue();
 
-                    List<Path> tempFiles = new ArrayList<>();
-                    Map<Path, String> extensions = new HashMap<>();
+                            String baseName =
+                                    folder.getFileName()
+                                            .toString();
 
-                    /* ---------- PASS 1 : TEMP RENAME ---------- */
+                            List<Path> tempFiles =
+                                    new ArrayList<>();
 
-                    for (File file : files) {
+                            Map<Path, String> extensions =
+                                    new HashMap<>();
 
-                        try {
+                            /* ---------- PASS 1 : TEMP ---------- */
 
-                            String ext = getExtension(file);
+                            for (File file : files) {
 
-                            Path temp = file.toPath().resolveSibling(
-                                    "temp_" + UUID.randomUUID()
-                            );
+                                try {
 
-                            Files.move(file.toPath(), temp);
+                                    String ext =
+                                            getExtension(file);
 
-                            tempFiles.add(temp);
-                            extensions.put(temp, ext);
+                                    Path temp =
+                                            file.toPath()
+                                                    .resolveSibling(
+                                                            "temp_"
+                                                                    + UUID.randomUUID()
+                                                                    + ext
+                                                    );
 
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
+                                    Files.move(
+                                            file.toPath(),
+                                            temp
+                                    );
 
-                    int index = 1;
+                                    tempFiles.add(temp);
 
-                    /* ---------- PASS 2 : FINAL RENAME ---------- */
+                                    extensions.put(temp, ext);
 
-                    for (Path temp : tempFiles) {
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
 
-                        try {
+                            int index = 1;
 
-                            String ext = extensions.get(temp);
+                            /* ---------- PASS 2 : FINAL ---------- */
 
-                            Path targetFolder = gatherInContainerCheckbox.isSelected()
-                                    ? finalContainerDirectory.toPath()
-                                    : folder;
+                            for (Path temp : tempFiles) {
 
-                            Path target = targetFolder.resolve(
-                                    baseName + "_" + index + ext
-                            );
+                                try {
 
-                            Files.move(temp, target);
+                                    String ext =
+                                            extensions.get(temp);
 
-                            index++;
+                                    Path targetFolder =
+                                            gatherInContainerCheckbox.isSelected()
+                                                    ? finalContainerDirectory.toPath()
+                                                    : folder;
 
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                                    Path target;
 
-                        int done = processed.incrementAndGet();
+                                    while (true) {
 
-                        updateProgress(done, total);
+                                        target =
+                                                targetFolder.resolve(
+                                                        baseName
+                                                                + "_"
+                                                                + index
+                                                                + ext
+                                                );
 
-                        updateMessage("Processed " + done + " / " + total);
-                    }
+                                        if (!Files.exists(target)) {
+                                            break;
+                                        }
 
-                });
+                                        index++;
+                                    }
+
+                                    Files.move(temp, target);
+
+                                    index++;
+
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+
+                                int done =
+                                        processed.incrementAndGet();
+
+                                updateProgress(done, total);
+
+                                updateMessage(
+                                        "Processed "
+                                                + done
+                                                + " / "
+                                                + total
+                                );
+                            }
+                        });
+
+                updateProgress(total, total);
 
                 updateMessage("Completed ✔");
 
@@ -611,8 +779,39 @@ public class FileManagerController {
             }
         };
 
-        progressBar2.progressProperty().bind(task.progressProperty());
-        renameStatusLabel.textProperty().bind(task.messageProperty());
+        progressBar2.progressProperty()
+                .bind(task.progressProperty());
+
+        renameStatusLabel.textProperty()
+                .bind(task.messageProperty());
+
+        task.setOnSucceeded(e -> {
+
+            progressBar2.progressProperty().unbind();
+
+            progressBar2.setProgress(1);
+
+            messageService.showMessage(
+                    Alert.AlertType.INFORMATION,
+                    "Completed",
+                    "Renaming finished successfully."
+            );
+        });
+
+        task.setOnFailed(e -> {
+
+            progressBar2.progressProperty().unbind();
+
+            progressBar2.setVisible(false);
+
+            task.getException().printStackTrace();
+
+            messageService.showMessage(
+                    Alert.AlertType.ERROR,
+                    "Error",
+                    "An error occurred during renaming."
+            );
+        });
 
         new Thread(task, "rename-task").start();
     }
@@ -622,7 +821,51 @@ public class FileManagerController {
 
     @FXML
     private void handleGatherInContainer() {
-        containerNameField.setVisible(gatherInContainerCheckbox.isSelected());
+
+        containerNameField.setVisible(
+                gatherInContainerCheckbox.isSelected()
+        );
+    }
+
+    /* ---------- DELETE EMPTY SUBFOLDERS ---------- */
+
+    private void deleteEmptySubfolders(File rootFolder) {
+
+        try (Stream<Path> walk = Files.walk(rootFolder.toPath())) {
+
+            List<Path> folders = walk
+                    .filter(Files::isDirectory)
+                    .sorted(Comparator.reverseOrder())
+                    .collect(Collectors.toList());
+
+            for (Path folder : folders) {
+
+                // ne jamais supprimer le dossier racine
+                if (folder.equals(rootFolder.toPath())) {
+                    continue;
+                }
+
+                try (Stream<Path> content = Files.list(folder)) {
+
+                    boolean isEmpty = !content.findFirst().isPresent();
+
+                    if (isEmpty) {
+                        Files.delete(folder);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /* ---------- REDUCE SUBFOLDERS ACTION ---------- */
+
+    @FXML
+    private void handleReduceSubfolders() {
+
+        // réservé pour futur usage UI
     }
 
     /* ================================== */

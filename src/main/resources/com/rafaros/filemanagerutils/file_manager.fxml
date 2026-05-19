@@ -264,6 +264,9 @@
                     <Button text="Rename Content"
                             fx:id="renameButton"
                             onAction="#handleRenameContent"/>
+                    <CheckBox fx:id="reduceSubfoldersCheckbox"
+                              text="Reduce subfolders"
+                              onAction="#handleReduceSubfolders"/>
                     <CheckBox fx:id="gatherInContainerCheckbox"
                               text="Rassembler dans :"
                               onAction="#handleGatherInContainer"/>
